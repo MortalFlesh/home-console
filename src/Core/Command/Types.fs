@@ -1,0 +1,1 @@
+namespace MF.HomeConsole

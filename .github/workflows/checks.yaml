@@ -1,0 +1,46 @@
+name: Check
+
+on:
+    #push:
+    pull_request:
+    schedule:
+        -   cron: '0 3 * * *'
+
+jobs:
+    build:
+        strategy:
+            matrix:
+                os: [windows-latest, macos-latest, ubuntu-latest]
+                dotnet: [6.0.202]
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Setup .NET Core
+                uses: actions/setup-dotnet@v1
+                with:
+                    dotnet-version: ${{ matrix.dotnet }}
+
+            -   name: Restore tools
+                run: dotnet tool restore
+
+            -   name: Run tests
+                run: dotnet fake build
+
+    tests:
+        runs-on: macos-latest
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   name: Setup .NET Core
+                uses: actions/setup-dotnet@v1
+                with:
+                    dotnet-version: 6.0.202
+
+            -   name: Restore tools
+                run: dotnet tool restore
+
+            -   name: Run tests
+                run: dotnet fake build -t tests no-clean
