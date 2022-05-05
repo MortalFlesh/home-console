@@ -16,6 +16,8 @@ module Console =
     module Option =
         let config = Option.required "config" (Some "c") "File where the configuration is." (Some ".config.json")
 
-    (* [<RequireQualifiedAccess>]
+    [<RequireQualifiedAccess>]
     module Input =
-        let getRepositories = Input.getArgumentValueAsList "repositories" *)
+        // let getRepositories = Input.getArgumentValueAsList "repositories"
+
+        let config = Input.getOptionValue "config"

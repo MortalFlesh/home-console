@@ -11,19 +11,15 @@ let main argv =
         info ApplicationInfo.MainTitle
         version AssemblyVersionInformation.AssemblyVersion
 
-        (* command "calendar:show:events" {
-            Description = "Show events from a office365 calendar."
+        command "home:send" {
+            Description = "Send data to storage."
             Help = None
-            Arguments = []
-            Options = []
+            Arguments = SendDevicesDataCommand.arguments
+            Options = SendDevicesDataCommand.options
             Initialize = None
             Interact = None
-            Execute = fun (input, output) ->
-                Calendar.show output
-
-                output.Success "Done"
-                ExitCode.Success
-        } *)
+            Execute = SendDevicesDataCommand.execute
+        }
 
         command "about" {
             Description = "Displays information about the current project."

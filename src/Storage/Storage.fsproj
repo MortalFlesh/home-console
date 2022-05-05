@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Library</OutputType>
         <TargetFramework>net6.0</TargetFramework>
     </PropertyGroup>
 
@@ -10,18 +9,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../ErrorHandling/ErrorHandling.fsproj" />
         <ProjectReference Include="../Utils/Utils.fsproj" />
-        <ProjectReference Include="../Storage/Storage.fsproj" />
+        <ProjectReference Include="../ErrorHandling/ErrorHandling.fsproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="Console.fs" />
-
-        <Compile Include="Command/Types.fs" />
-        <Compile Include="Config.fs" />
-
-        <Compile Include="Command/SendDevicesData.fs" />
+        <Compile Include="Types.fs" />
+        <Compile Include="GoogleSheets.fs" />
     </ItemGroup>
 
     <Import Project="..\..\.paket\Paket.Restore.targets" />
