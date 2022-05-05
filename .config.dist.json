@@ -1,0 +1,14 @@
+{
+    "eaton": {
+        "credentials": {
+            "username": "",
+            "password": ""
+        },
+        "host": "127.0.0.1",
+        "devices": "devices.dist.json"
+    },
+    "googleSheets": {
+        "credentials": "todo",
+        "list": "todo"
+    }
+}

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Library</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="AssemblyInfo.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../ErrorHandling/ErrorHandling.fsproj" />
+        <ProjectReference Include="../Utils/Utils.fsproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Console.fs" />
+
+        <Compile Include="Command/Types.fs" />
+    </ItemGroup>
+
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>
