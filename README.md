@@ -24,6 +24,10 @@ dist/home-console list
 
 todo - show help
 
+### Google Sheets Api
+You need to create credentials for your google sheets (see https://console.cloud.google.com/apis/api/sheets.googleapis.com/overview).
+And place them as `credentials.json` to the `credentials/credentials.json` and then, on the first run, you will be prompted to authorize app by your google account (_link for this will be shown in the terminal_). After that token for authorization will be stored in `credentials/token.json`.
+
 ---
 ### Development
 

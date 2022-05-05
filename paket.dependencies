@@ -4,6 +4,7 @@ storage: none
 
 nuget FSharp.Core ~> 6.0
 nuget FSharp.Data ~> 4.0
+nuget Google.Apis.Sheets.v4
 nuget MF.ConsoleApplication ~> 2.0
 
 // [ FAKE GROUP ]

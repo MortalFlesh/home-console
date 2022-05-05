@@ -30,6 +30,7 @@ paket-files/
 dist
 data
 output
+credentials
 
 # configs
 .config.json

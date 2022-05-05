@@ -8,7 +8,9 @@
         "devices": "devices.dist.json"
     },
     "googleSheets": {
-        "credentials": "todo",
-        "list": "todo"
+        "applicationName": "home-console",
+        "credentials": "credentials/credentials.json",
+        "token": "credentials/token.json",
+        "spreadsheetId": "list-id"
     }
 }
