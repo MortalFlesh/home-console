@@ -2,8 +2,12 @@
     {
         "eaton": {
             "credentials": {
-                "username": "",
-                "password": ""
+                "username": "admin",
+                "password": "password",
+                "path": "/tmp/eaton-cookies.json"
+            },
+            "history": {
+                "download": "./eaton"
             },
             "host": "127.0.0.1",
             "devices": "devices.dist.json"
@@ -14,5 +18,5 @@
             "token": "credentials/token.json",
             "spreadsheetId": "list-id"
         }
-    }    
+    }
 ]

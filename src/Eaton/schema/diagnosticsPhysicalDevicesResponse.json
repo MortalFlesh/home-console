@@ -1,0 +1,39 @@
+[
+    {
+        "result": [
+            {
+                "rssiId": "1",
+                "serialNr": "1234567_u0",
+                "rssi": "Good",
+                "flag": " ",
+                "powered": "Výborná",
+                "name": "Device 1",
+                "poweredId": "1",
+                "checked": "false",
+                "deviceUid": "hdm:xComfort Adapter:1234567",
+                "type": "Push-Button single CTAA-01/xx"
+            },
+            {
+                "name": "Meteo-oblačnost",
+                "checked": "false",
+                "deviceUid": "hdm:Weather Service Protocol Adapter:49150001234_c",
+                "parentId": "hdm:Weather Service Protocol Adapter:49150001234"
+            },
+            {
+                "serialNr": "",
+                "flag": "",
+                "name": "Weather station",
+                "checked": "false",
+                "deviceUid": "hdm:Weather Service Protocol Adapter:49150001234",
+                "type": ""
+            },
+            {
+                "name": "s.stairs , s.tv , s.bedroom , unknown ",
+                "checked": "false",
+                "deviceUid": "hdm:xComfort Adapter:g123intf0dp42"
+            }
+        ],
+        "id": 42,
+        "jsonrpc": "2.0"
+    }
+]
