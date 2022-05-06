@@ -1,9 +1,11 @@
 namespace MF.HomeConsole
 
 open MF.Storage
+open MF.Eaton
 
 type Config = {
     GoogleSheets: GoogleSheets.Config
+    Eaton: EatonConfig
 }
 
 [<RequireQualifiedAccess>]
@@ -27,5 +29,12 @@ module Config =
                     Credentials = parsed.GoogleSheets.Credentials
                     Token = parsed.GoogleSheets.Token
                     SpreadsheetId = parsed.GoogleSheets.SpreadsheetId
+                }
+                Eaton = {
+                    Host = parsed.Eaton.Host
+                    Credentials = {
+                        Name = parsed.Eaton.Credentials.Username
+                        Password = parsed.Eaton.Credentials.Password
+                    }
                 }
             }

@@ -16,25 +16,20 @@ module SendDevicesDataCommand =
         Console.Option.config
     ]
 
-    type SendDevicesDataError =
-        | Message of string
-        | Exception of exn
-        | Errors of SendDevicesDataError list
-
     let execute (input, output) =
         output.SubTitle "Starting ..."
 
-        let result =
+        let result: Result<_, CommandError> =
             asyncResult {
                 let! config =
                     input
                     |> Input.config
                     |> Config.parse
-                    |> Result.ofOption (Message "invalid config")
+                    |> Result.ofOption (CommandError.Message "invalid config")
 
                 let! (tabs: TabName list) =
                     GoogleSheets.getTabs config.GoogleSheets
-                    |> AsyncResult.mapError Exception
+                    |> AsyncResult.mapError CommandError.Exception
 
                 let existingTabs = tabs |> Set.ofList
 
@@ -47,11 +42,11 @@ module SendDevicesDataCommand =
                     |> List.map (fun tabName ->
                         tabName
                         |> GoogleSheets.createTab config.GoogleSheets
-                        |> AsyncResult.mapError Exception
+                        |> AsyncResult.mapError CommandError.Exception
                     )
-                    |> AsyncResult.ofSequentialAsyncResults Exception
+                    |> AsyncResult.ofSequentialAsyncResults CommandError.Exception
                     |> AsyncResult.ignore
-                    |> AsyncResult.mapError Errors
+                    |> AsyncResult.mapError CommandError.Errors
             }
             |> Async.RunSynchronously
 
