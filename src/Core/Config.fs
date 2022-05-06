@@ -36,5 +36,8 @@ module Config =
                         Name = parsed.Eaton.Credentials.Username
                         Password = parsed.Eaton.Credentials.Password
                     }
+                    History = {
+                        Download = parsed.Eaton.History.Download
+                    }
                 }
             }

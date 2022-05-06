@@ -48,6 +48,8 @@ module Api =
             }
             |> AsyncResult.mapError ApiError.Exception
 
+    let inline private (/) a b = Path.Combine(a, b)
+
     let run (config: EatonConfig) =
         // todo - funguje to, ale chce to doladit (vytvorit si slozku, smazat predchozi soubor, ... a pak mozna i rovnou rozbalit ten zip)
         // todo - taky tahat veci z configu
@@ -60,7 +62,11 @@ module Api =
                 "p" => config.Credentials.Password
             ]
 
-            let configFile = "/Users/chromecp/fsharp/home-console/eaton/config.zip"
+            let targetDir =
+                config.History.Download
+                |> tee Directory.ensure
+
+            let configFile = targetDir / "config.zip"
 
             // todo - kouknout na cookie container
             // open System.Net
@@ -92,9 +98,6 @@ module Api =
             } |> AsyncResult.mapError ApiError.Exception)
 
             printfn "Extracting a file ..."
-            let targetDir =
-                "/Users/chromecp/fsharp/home-console/eaton"
-                |> tee Directory.ensure
             ZipFile.ExtractToDirectory(configFile, targetDir)
 
             return ()
