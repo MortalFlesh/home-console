@@ -3,7 +3,8 @@
         "eaton": {
             "credentials": {
                 "username": "admin",
-                "password": "password"
+                "password": "password",
+                "path": "/tmp/eaton-cookies.json"
             },
             "history": {
                 "download": "./eaton"

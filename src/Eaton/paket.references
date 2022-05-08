@@ -1,2 +1,4 @@
 FSharp.Core
 FSharp.Data
+Newtonsoft.Json
+MF.ConsoleApplication

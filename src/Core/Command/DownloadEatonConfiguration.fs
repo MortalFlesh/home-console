@@ -25,10 +25,17 @@ module DownloadEatonConfiguration =
                     |> Config.parse
                     |> Result.ofOption (CommandError.Message "invalid config")
 
-                return!
+                let! historyFilePath =
                     config.Eaton
-                    |> Api.run
+                    |> Api.downloadHistoryFile (input, output)
                     |> AsyncResult.mapError CommandError.ofEatonApiError
+
+                let! devices =
+                    config.Eaton
+                    |> Api.getDeviceList (input, output)
+                    |> AsyncResult.mapError CommandError.ofEatonApiError
+
+                return "Done"
             }
             |> Async.RunSynchronously
 
