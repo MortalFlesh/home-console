@@ -22,8 +22,7 @@ module Api =
     /// see https://stackoverflow.com/questions/1777203/c-writing-a-cookiecontainer-to-disk-and-loading-back-in-for-use
     let private loadCookies ((_, output): IO) (config: EatonConfig) =
         asyncResult {
-            // todo - if verbose
-            output.SubTitle "[Eaton][Cookies] Loading cookies ..."
+            if output.IsVerbose() then output.SubTitle "[Eaton][Cookies] Loading cookies ..."
 
             if config.Credentials.Path |> File.Exists then
                 use stream = File.OpenRead(config.Credentials.Path)
@@ -33,20 +32,20 @@ module Api =
                     | e -> AsyncResult.ofError (ApiError.Exception e)
 
                 cookies.Add cc
-                output.Success "✅ Cookies loaded"
+                if output.IsVerbose() then output.Success "✅ Cookies loaded"
             else
-                output.Message "⚠️  Stored cookies were not found"
+                if output.IsVerbose() then output.Message "⚠️  Stored cookies were not found"
         }
 
     let private persistCookies ((_, output): IO) (config: EatonConfig) =
         asyncResult {
-            output.SubTitle "[Eaton][Cookies] Saving cookies ..."
+            if output.IsVerbose() then output.SubTitle "[Eaton][Cookies] Saving cookies ..."
 
             config.Credentials.Path |> Path.GetDirectoryName |> Directory.ensure
             use stream = File.Create(config.Credentials.Path)
 
             do! JsonSerializer.SerializeAsync(stream, cookies.GetAllCookies())
-            output.Success "✅ Cookies saved"
+            if output.IsVerbose() then output.Success "✅ Cookies saved"
         }
         |> AsyncResult.mapError ApiError.Exception
 
@@ -76,15 +75,14 @@ module Api =
         let toJsonPretty: obj -> string = Json.serializePretty
         let toJson: obj -> string = Json.serialize
 
-    [<AutoOpen>]
+    [<RequireQualifiedAccess>]
     module private Http =
         open FSharp.Data.HttpRequestHeaders
 
-        type Url = Url of string
-        type Api = Api of string
-        type Path = Api -> Url
+        type private Path = HttpTypes.Path
 
-        let path (path: string): Path = fun (Api api) -> Url <| sprintf "%s/%s" (api.TrimEnd '/') (path.TrimStart '/')
+        let path (path: string): Path = fun (Api api) ->
+            sprintf "%s/%s" (api.TrimEnd '/') (path.TrimStart '/') |> Url
 
         [<RequireQualifiedAccess>]
         module Url =
@@ -159,7 +157,27 @@ module Api =
             }
             |> AsyncResult.mapError ApiError.Exception
 
+        let (|BadRequest|Unauthorized|NotFound|Unknown|) (e: exn) =
+            match e with
+            | :? System.Net.WebException as webException when webException.Message.Contains "(400) Bad Request" -> BadRequest
+            | :? System.Net.WebException as webException when webException.Message.Contains "(401) Unauthorized" -> Unauthorized
+            | :? System.Net.WebException as webException when webException.Message.Contains "(404) Not Found" -> NotFound
+            | e -> Unknown e
+
     let inline private (/) a b = Path.Combine(a, b)
+
+    let private retryOnUnathorized ((_, output): IO) (config: EatonConfig) action =
+        AsyncResult.bindError (function
+            | (ApiError.Exception Http.Unauthorized) when config.Credentials.Path |> File.Exists ->
+                if output.IsVerbose() then output.Message "[Retry] On Unauthorized action ..."
+
+                if output.IsVeryVerbose() then output.Message "[Retry] Remove credentials file to force login by form ..."
+                config.Credentials.Path |> File.Delete
+
+                if output.IsVeryVerbose() then output.Message "[Retry] Run action again ..."
+                action
+            | e -> AsyncResult.ofError e
+        )
 
     let private login ((_, output) as io: IO) config api = asyncResult {
         output.Section "[Eaton] Logging in ..."
@@ -167,15 +185,16 @@ module Api =
         if cookies.Count = 0 then
             do! loadCookies io config
 
-        let loginPath = path "/system/http/login"
+        let loginPath = Http.path "/system/http/login"
 
-        match cookies.GetCookies(loginPath |> Path.asUri api) with
+        match cookies.GetCookies(loginPath |> Http.Path.asUri api) with
         | eatonCookies when eatonCookies.Count > 0 ->
             output.Success "✅ Done (already logged in)"
             return ()
 
         | _ ->
-            // todo - log "logging in"
+            output.Message "Logging in by a form ..."
+
             let! (response: HttpResponse) =
                 [
                     "u" => config.Credentials.Name
@@ -190,11 +209,9 @@ module Api =
 
             do! persistCookies io config
             output.Success "✅ Done"
-
-            return ()
     }
 
-    let downloadHistoryFile ((_, output) as io: IO) (config: EatonConfig) =
+    let rec downloadHistoryFile ((_, output) as io: IO) (config: EatonConfig) =
         let deleteTemporaryFiles targetDir configFile tmpHistoryFilePath =
             output.Section "[Eaton] Clear temporary files ..."
             [
@@ -232,7 +249,7 @@ module Api =
             do! api |> login io config
 
             output.Section "[Eaton] Downloading ..."
-            let! (response: HttpResponseWithStream) = Http.getStream api (path "/BackupRestore/History?filename=history")
+            let! (response: HttpResponseWithStream) = Http.getStream api (Http.path "/BackupRestore/History?filename=history")
             output.Success "✅ Done"
 
             output.Section "[Eaton] Create a file ..."
@@ -259,10 +276,11 @@ module Api =
 
             return tmpHistoryFilePath
         }
+        |> retryOnUnathorized io config (downloadHistoryFile io config)
 
     type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
 
-    let getDeviceList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Device list, ApiError> =
+    let rec getDeviceList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Device list, ApiError> =
         asyncResult {
             let api = Api $"http://{config.Host}"
 
@@ -279,7 +297,7 @@ module Api =
                 |> Map.ofList
                 :> obj
 
-            let! (response: string) = Http.post api (path "/remote/json-rpc") rpc
+            let! (response: string) = Http.post api (Http.path "/remote/json-rpc") rpc
             output.Success "✅ Done"
 
             output.Section "[Eaton] Parsing devices ..."
@@ -303,3 +321,4 @@ module Api =
 
             return []
         }
+        |> retryOnUnathorized io config (getDeviceList io config)

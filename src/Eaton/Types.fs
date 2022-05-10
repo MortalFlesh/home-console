@@ -1,7 +1,13 @@
 namespace MF.Eaton
 
+[<AutoOpen>]
+module HttpTypes =
+    type Url = Url of string
+    type Api = Api of string
+    type Path = Api -> Url
+
 type EatonConfig = {
-    Host: string
+    Host: Api
     Credentials: Credentials
     History: HistoryConfig
 }
