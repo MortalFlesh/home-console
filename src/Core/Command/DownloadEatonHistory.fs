@@ -1,7 +1,7 @@
 namespace MF.HomeConsole
 
 [<RequireQualifiedAccess>]
-module DownloadEatonConfiguration =
+module DownloadEatonHistory =
     open System
     open FSharp.Data
     open MF.HomeConsole.Console
@@ -28,11 +28,6 @@ module DownloadEatonConfiguration =
                 let! historyFilePath =
                     config.Eaton
                     |> Api.downloadHistoryFile (input, output)
-                    |> AsyncResult.mapError CommandError.ofEatonApiError
-
-                let! devices =
-                    config.Eaton
-                    |> Api.getDeviceList (input, output)
                     |> AsyncResult.mapError CommandError.ofEatonApiError
 
                 return "Done"

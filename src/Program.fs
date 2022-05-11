@@ -21,14 +21,24 @@ let main argv =
             Execute = SendDevicesDataCommand.execute
         }
 
-        command "home:download" {
+        command "home:download:history" {
             Description = "Download current data from EATON app."
             Help = None
-            Arguments = DownloadEatonConfiguration.arguments
-            Options = DownloadEatonConfiguration.options
+            Arguments = DownloadEatonHistory.arguments
+            Options = DownloadEatonHistory.options
             Initialize = None
             Interact = None
-            Execute = DownloadEatonConfiguration.execute
+            Execute = DownloadEatonHistory.execute
+        }
+
+        command "home:download:devices" {
+            Description = "Download current devices list from EATON app."
+            Help = None
+            Arguments = DownloadEatonDeviceList.arguments
+            Options = DownloadEatonDeviceList.options
+            Initialize = None
+            Interact = None
+            Execute = DownloadEatonDeviceList.execute
         }
 
         command "about" {

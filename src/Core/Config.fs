@@ -31,7 +31,7 @@ module Config =
                     SpreadsheetId = parsed.GoogleSheets.SpreadsheetId
                 }
                 Eaton = {
-                    Host = parsed.Eaton.Host
+                    Host = Api $"http://{parsed.Eaton.Host}"
                     Credentials = {
                         Name = parsed.Eaton.Credentials.Username
                         Password = parsed.Eaton.Credentials.Password

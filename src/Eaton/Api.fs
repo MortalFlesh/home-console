@@ -164,6 +164,43 @@ module Api =
             | :? System.Net.WebException as webException when webException.Message.Contains "(404) Not Found" -> NotFound
             | e -> Unknown e
 
+    module RPC =
+        let mutable private id = 1000
+
+        type Request<'Params> = {
+            Id: int
+            Method: string
+            Parameters: 'Params
+        }
+
+        [<RequireQualifiedAccess>]
+        module Request =
+            let create method parameters =
+                id <- id + 1
+                {
+                    Id = id
+                    Method = method
+                    Parameters = parameters
+                }
+
+        let call config request = asyncResult {
+            let rpc =
+                [
+                    "id" => (request.Id :> obj)
+                    "jsonrpc" => ("2.0" :> obj)
+                    "method" => (request.Method :> obj)
+                    "params" => (request.Parameters :> obj)
+                ]
+                |> Map.ofList
+                :> obj
+
+            let! (response: string) =
+                rpc
+                |> Http.post config.Host (Http.path "/remote/json-rpc")
+
+            return response
+        }
+
     let inline private (/) a b = Path.Combine(a, b)
 
     let private retryOnUnathorized ((_, output): IO) (config: EatonConfig) action =
@@ -172,6 +209,7 @@ module Api =
                 if output.IsVerbose() then output.Message "[Retry] On Unauthorized action ..."
 
                 if output.IsVeryVerbose() then output.Message "[Retry] Remove credentials file to force login by form ..."
+                cookies.GetAllCookies().Clear()
                 config.Credentials.Path |> File.Delete
 
                 if output.IsVeryVerbose() then output.Message "[Retry] Run action again ..."
@@ -179,7 +217,7 @@ module Api =
             | e -> AsyncResult.ofError e
         )
 
-    let private login ((_, output) as io: IO) config api = asyncResult {
+    let private login ((_, output) as io: IO) config = asyncResult {
         output.Section "[Eaton] Logging in ..."
 
         if cookies.Count = 0 then
@@ -187,7 +225,7 @@ module Api =
 
         let loginPath = Http.path "/system/http/login"
 
-        match cookies.GetCookies(loginPath |> Http.Path.asUri api) with
+        match cookies.GetCookies(loginPath |> Http.Path.asUri config.Host) with
         | eatonCookies when eatonCookies.Count > 0 ->
             output.Success "✅ Done (already logged in)"
             return ()
@@ -200,7 +238,7 @@ module Api =
                     "u" => config.Credentials.Name
                     "p" => config.Credentials.Password
                 ]
-                |> Http.postForm api loginPath
+                |> Http.postForm config.Host loginPath
 
             let! _ =
                 response.Cookies
@@ -211,7 +249,7 @@ module Api =
             output.Success "✅ Done"
     }
 
-    let rec downloadHistoryFile ((_, output) as io: IO) (config: EatonConfig) =
+    let downloadHistoryFile ((_, output) as io: IO) (config: EatonConfig) =
         let deleteTemporaryFiles targetDir configFile tmpHistoryFilePath =
             output.Section "[Eaton] Clear temporary files ..."
             [
@@ -234,9 +272,7 @@ module Api =
             }
             |> AsyncResult.mapError ApiError.Exception
 
-        asyncResult {
-            let api = Api $"http://{config.Host}"
-
+        let execute = asyncResult {
             let targetDir =
                 config.History.DownloadDirectory
                 |> tee Directory.ensure
@@ -246,10 +282,10 @@ module Api =
 
             deleteTemporaryFiles targetDir configFile tmpHistoryFilePath
 
-            do! api |> login io config
+            do! login io config
 
             output.Section "[Eaton] Downloading ..."
-            let! (response: HttpResponseWithStream) = Http.getStream api (Http.path "/BackupRestore/History?filename=history")
+            let! (response: HttpResponseWithStream) = Http.getStream config.Host (Http.path "/BackupRestore/History?filename=history")
             output.Success "✅ Done"
 
             output.Section "[Eaton] Create a file ..."
@@ -276,28 +312,21 @@ module Api =
 
             return tmpHistoryFilePath
         }
-        |> retryOnUnathorized io config (downloadHistoryFile io config)
+
+        execute
+        |> retryOnUnathorized io config execute
 
     type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
 
     let rec getDeviceList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Device list, ApiError> =
-        asyncResult {
-            let api = Api $"http://{config.Host}"
-
-            do! api |> login io config
+        let execute = asyncResult {
+            do! login io config
 
             output.Section "[Eaton] Downloading ..."
-            let rpc =
-                [
-                    "id" => (42 :> obj) // todo ??
-                    "jsonrpc" => ("2.0" :> obj)
-                    "method" => ("Diagnostics/getPhysicalDevices" :> obj)
-                    "params" => ([] :> obj)
-                ]
-                |> Map.ofList
-                :> obj
+            let! response =
+                RPC.Request.create "Diagnostics/getPhysicalDevices" []
+                |> RPC.call config
 
-            let! (response: string) = Http.post api (Http.path "/remote/json-rpc") rpc
             output.Success "✅ Done"
 
             output.Section "[Eaton] Parsing devices ..."
@@ -321,4 +350,6 @@ module Api =
 
             return []
         }
-        |> retryOnUnathorized io config (getDeviceList io config)
+
+        execute
+        |> retryOnUnathorized io config execute

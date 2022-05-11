@@ -23,7 +23,8 @@
         <Compile Include="Config.fs" />
 
         <Compile Include="Command/SendDevicesData.fs" />
-        <Compile Include="Command/DownloadEatonConfiguration.fs" />
+        <Compile Include="Command/DownloadEatonHistory.fs" />
+        <Compile Include="Command/DownloadEatonDeviceList.fs" />
     </ItemGroup>
 
     <Import Project="..\..\.paket\Paket.Restore.targets" />
