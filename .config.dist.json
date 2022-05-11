@@ -1,8 +1,12 @@
 {
     "eaton": {
         "credentials": {
-            "username": "",
-            "password": ""
+            "username": "admin",
+            "password": "password",
+            "path": "./eaton/cookies.json"
+        },
+        "history": {
+            "download": "./eaton"
         },
         "host": "127.0.0.1",
         "devices": "devices.dist.json"
