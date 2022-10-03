@@ -1,10 +1,8 @@
 namespace MF.HomeConsole
 
-open MF.Storage
 open MF.Eaton
 
 type Config = {
-    GoogleSheets: GoogleSheets.Config
     Eaton: EatonConfig
 }
 
@@ -24,12 +22,6 @@ module Config =
                 |> ConfigSchema.Parse
 
             Some {
-                GoogleSheets = {
-                    ApplicationName = parsed.GoogleSheets.ApplicationName
-                    Credentials = parsed.GoogleSheets.Credentials
-                    Token = parsed.GoogleSheets.Token
-                    SpreadsheetId = parsed.GoogleSheets.SpreadsheetId
-                }
                 Eaton = {
                     Host = Api $"http://{parsed.Eaton.Host}"
                     Credentials = {

@@ -135,3 +135,53 @@ module Http =
         | :? System.Net.WebException as webException when webException.Message.Contains "(401) Unauthorized" -> Unauthorized
         | :? System.Net.WebException as webException when webException.Message.Contains "(404) Not Found" -> NotFound
         | e -> Unknown e
+
+module Logging =
+    open System
+    open Microsoft.Extensions.Logging
+
+    let private normalizeString (string: string) =
+        string.Replace(" ", "").ToLowerInvariant()
+
+    [<RequireQualifiedAccess>]
+    module LogLevel =
+        (* let fromVerbosity (verbosity: MF.ConsoleStyle.Verbosity) =
+            LogLevel.Trace *)
+
+        let parse = normalizeString >> function
+            | "trace" | "vvv" -> LogLevel.Trace
+            | "debug" | "vv" -> LogLevel.Debug
+            | "information" | "v" | "normal" -> LogLevel.Information
+            | "warning" -> LogLevel.Warning
+            | "error" -> LogLevel.Error
+            | "critical" -> LogLevel.Critical
+            | "quiet" | "q" | _ -> LogLevel.None
+
+    [<RequireQualifiedAccess>]
+    module LoggerFactory =
+        open NReco.Logging.File
+
+        let createWithFileLogging (path: string) level =
+            LoggerFactory.Create(fun builder ->
+                builder
+                    .SetMinimumLevel(level)
+                    .AddFile(
+                        path,
+                        fun c ->
+                            c.FormatLogFileName <- fun name -> String.Format(name, DateTime.UtcNow)
+                            c.Append <- true
+                            c.MinLevel <- LogLevel.Trace
+                    )
+                |> ignore
+            )
+
+        let createForCommand command =
+            createWithFileLogging (command |> normalizeString |> sprintf "logs/log_%s_{0:yyyy}-{0:MM}-{0:dd}.log")
+
+        let create level =
+            LoggerFactory.Create(fun builder ->
+                builder
+                    .SetMinimumLevel(level)
+                    .AddConsole(fun c -> c.LogToStandardErrorThreshold <- LogLevel.Error)
+                |> ignore
+            )

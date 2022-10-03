@@ -37,8 +37,10 @@ let gitBranch = Information.getBranchName(".")
 /// Runtime IDs: https://docs.microsoft.com/en-us/dotnet/core/rid-catalog#macos-rids
 let runtimeIds =
     [
+        "alpine.3.16-arm64" // Raspberry Pi - Hassio Addon
         "osx-x64"
-        "linux-arm64"   // Raspbery PI
+        // "linux-arm64"
+        // "linux-musl-x64"    // alpine
         "win-x64"
     ]
 

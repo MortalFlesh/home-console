@@ -17,7 +17,7 @@ module Api =
 
     type IO = MF.ConsoleApplication.IO
 
-    let private cookies = CookieContainer()
+    let mutable private cookies = CookieContainer()
 
     /// see https://stackoverflow.com/questions/1777203/c-writing-a-cookiecontainer-to-disk-and-loading-back-in-for-use
     let private loadCookies ((_, output): IO) (config: EatonConfig) =
@@ -197,13 +197,19 @@ module Api =
     let inline private (/) a b = Path.Combine(a, b)
 
     let private retryOnUnathorized ((_, output): IO) (config: EatonConfig) action =
-        AsyncResult.bindError (function
-            | (ApiError.Exception Http.Unauthorized) when config.Credentials.Path |> File.Exists ->
+        action
+        |> AsyncResult.bindError (function
+            | (ApiError.Exception Http.Unauthorized) ->
                 if output.IsVerbose() then output.Message "[Retry] On Unauthorized action ..."
 
-                if output.IsVeryVerbose() then output.Message "[Retry] Remove credentials file to force login by form ..."
-                cookies.GetAllCookies().Clear()
-                config.Credentials.Path |> File.Delete
+                if output.IsVeryVerbose() then output.Message "[Retry] Clear cookies ..."
+                cookies <- CookieContainer()
+
+                if config.Credentials.Path |> File.Exists then
+                    if output.IsVeryVerbose() then output.Message "[Retry] Remove credentials file to force login by form ..."
+                    cookies.GetAllCookies().Clear()
+                    config.Credentials.Path |> File.Delete
+                elif output.IsVeryVerbose() then output.Message "[Retry] Credentials file is not presented ..."
 
                 if output.IsVeryVerbose() then output.Message "[Retry] Run action again ..."
                 action
@@ -307,7 +313,7 @@ module Api =
         }
 
         execute
-        |> retryOnUnathorized io config execute
+        |> retryOnUnathorized io config
 
     type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
 
@@ -348,4 +354,4 @@ module Api =
         }
 
         execute
-        |> retryOnUnathorized io config execute
+        |> retryOnUnathorized io config

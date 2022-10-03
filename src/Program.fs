@@ -11,16 +11,6 @@ let main argv =
         info ApplicationInfo.MainTitle
         version AssemblyVersionInformation.AssemblyVersion
 
-        command "home:send" {
-            Description = "Send data to storage."
-            Help = None
-            Arguments = SendDevicesDataCommand.arguments
-            Options = SendDevicesDataCommand.options
-            Initialize = None
-            Interact = None
-            Execute = SendDevicesDataCommand.execute
-        }
-
         command "home:download:history" {
             Description = "Download current data from EATON app."
             Help = None
@@ -39,6 +29,16 @@ let main argv =
             Initialize = None
             Interact = None
             Execute = DownloadEatonDeviceList.execute
+        }
+
+        command "home:web:run" {
+            Description = "Run a webserver which expose sensor data on <c:yellow>http://0.0.0.0:8080/sensors</c> as a json."
+            Help = None
+            Arguments = RunWebServerCommand.arguments
+            Options = RunWebServerCommand.options
+            Initialize = None
+            Interact = None
+            Execute = RunWebServerCommand.execute
         }
 
         command "about" {
