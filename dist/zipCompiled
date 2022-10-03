@@ -2,4 +2,5 @@
 
 set -e
 
-tar cvzf dist/alpine.3.16-arm64.tar.gz dist/alpine.3.16-arm64
+cd dist
+tar cvzf alpine.3.16-arm64.tar.gz alpine.3.16-arm64
