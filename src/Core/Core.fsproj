@@ -12,7 +12,6 @@
     <ItemGroup>
         <ProjectReference Include="../ErrorHandling/ErrorHandling.fsproj" />
         <ProjectReference Include="../Utils/Utils.fsproj" />
-        <ProjectReference Include="../Storage/Storage.fsproj" />
         <ProjectReference Include="../Eaton/Eaton.fsproj" />
     </ItemGroup>
 
@@ -22,9 +21,9 @@
         <Compile Include="Command/Types.fs" />
         <Compile Include="Config.fs" />
 
-        <Compile Include="Command/SendDevicesData.fs" />
         <Compile Include="Command/DownloadEatonHistory.fs" />
         <Compile Include="Command/DownloadEatonDeviceList.fs" />
+        <Compile Include="Command/RunWebServer.fs" />
     </ItemGroup>
 
     <Import Project="..\..\.paket\Paket.Restore.targets" />
