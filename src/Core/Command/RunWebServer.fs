@@ -16,9 +16,7 @@ module RunWebServerCommand =
     open MF.HomeConsole.Console
 
     let arguments = []
-    let options = [
-        Console.Option.config
-    ]
+    let options = []
 
     let private webServer (loggerFactory: ILoggerFactory) httpHandlers = application {
             url "http://0.0.0.0:8080/"
@@ -45,11 +43,11 @@ module RunWebServerCommand =
 
         let result: Result<_, CommandError> =
             result {
-                let! config =
+                (* let! config =
                     input
                     |> Input.config
                     |> Config.parse
-                    |> Result.ofOption (CommandError.Message "invalid config")
+                    |> Result.ofOption (CommandError.Message "invalid config") *)
 
                 use loggerFactory =
                     "debug"

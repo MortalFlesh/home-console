@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Fix `home:web:run` command option - remove unused `config`
+- Fix `.config.dist.json` schema
 
 ## 1.3.0 - 2022-10-03
 - Build for Raspberry Pi architecture (`alpine.3.16-arm64`)
