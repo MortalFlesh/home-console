@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.3.0 - 2022-10-03
 - Build for Raspberry Pi architecture (`alpine.3.16-arm64`)
 - [**BC**] Remove `Google Sheets` integration
 - Add Command for running a web server with sensors data (**currently dummy data**)
