@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+## 1.4.0 - 2022-10-03
+- Add ingress index page for Web server
 
 ## 1.3.1 - 2022-10-03
 - Fix `home:web:run` command option - remove unused `config`
