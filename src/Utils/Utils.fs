@@ -48,6 +48,9 @@ module String =
     let toLower (value: string) =
         value.ToLower()
 
+    let trim (string: string) =
+        string.Trim(' ')
+
     let ucFirst (value: string) =
         match value |> Seq.toList with
         | [] -> ""
