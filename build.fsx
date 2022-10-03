@@ -10,7 +10,7 @@ open Fake.Core.TargetOperators
 open Fake.Tools.Git
 
 // ========================================================================================================
-// === F# / Console Application fake build ======================================================== 2.1.0 =
+// === F# / Console Application fake build ======================================================== 2.2.0 =
 // --------------------------------------------------------------------------------------------------------
 // Options:
 //  - no-clean   - disables clean of dirs in the first step (required on CI)
@@ -33,6 +33,7 @@ let summary = "Console application to help with home automations."
 let changeLog = Some "CHANGELOG.md"
 let gitCommit = Information.getCurrentSHA1(".")
 let gitBranch = Information.getBranchName(".")
+let releaseDir = "./dist"
 
 /// Runtime IDs: https://docs.microsoft.com/en-us/dotnet/core/rid-catalog#macos-rids
 let runtimeIds =
@@ -184,6 +185,15 @@ Target.create "Tests" (fun _ ->
 )
 
 let zipRelease releaseDir =
+    Trace.tracefn "\nZip compiled files"
+    runtimeIds
+    |> List.iter (fun runtimeId ->
+        Trace.tracefn " -> zipping %s ..." runtimeId
+        let zipFile = sprintf "%s.zip" runtimeId
+        IO.File.Delete zipFile
+        Zip.zip releaseDir (releaseDir </> zipFile) !!(releaseDir </> runtimeId </> "*")
+    )
+
     if releaseDir </> "zipCompiled" |> File.exists
     then
         let zipReleaseProcess = createProcess (releaseDir </> "zipCompiled")
@@ -191,19 +201,25 @@ let zipRelease releaseDir =
         Trace.tracefn "\nZipping released files in %s ..." releaseDir
         run zipReleaseProcess "" "."
         |> Trace.tracefn "Zip result:\n%A\n"
-    else
-        Trace.tracefn "\nZip compiled files"
-        runtimeIds
-        |> List.iter (fun runtimeId ->
-            Trace.tracefn " -> zipping %s ..." runtimeId
-            let zipFile = sprintf "%s.zip" runtimeId
-            IO.File.Delete zipFile
-            Zip.zip releaseDir (releaseDir </> zipFile) !!(releaseDir </> runtimeId </> "*")
-        )
 
 Target.create "Release" (fun _ ->
-    let releaseDir = Path.getFullName "./dist"
+    let releaseDir = Path.getFullName releaseDir
 
+    Trace.tracefn "\nClean previous releases"
+    runtimeIds
+    |> Seq.collect (fun runtimeId ->
+        Trace.tracefn " - %s" runtimeId
+        !! (releaseDir </> runtimeId)
+    )
+    |> Shell.cleanDirs
+
+    Trace.tracefn "\nClean previous zipped releases"
+    !! (releaseDir </> "*.zip")
+    ++ (releaseDir </> "*.tar.gz")
+    |> Seq.map (tee (Trace.tracefn " - %s"))
+    |> Seq.iter File.delete
+
+    Trace.tracefn "\nPublish current release"
     ProjectSources.release
     |> Seq.collect (fun project -> runtimeIds |> List.collect (fun runtimeId -> [project, runtimeId]))
     |> Seq.iter (fun (project, runtimeId) ->
