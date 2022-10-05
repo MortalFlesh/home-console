@@ -271,7 +271,7 @@ module Api =
             }
             |> AsyncResult.mapError ApiError.Exception
 
-        let execute = asyncResult {
+        asyncResult {
             let targetDir =
                 config.History.DownloadDirectory
                 |> tee Directory.ensure
@@ -311,16 +311,16 @@ module Api =
 
             return tmpHistoryFilePath
         }
-
-        execute
         |> retryOnUnathorized io config
 
     type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
+    type private DevicesStatusSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesWithLogStatsResponse.json", SampleIsList = true>
+    type private StatItemSchema = JsonProvider<"schema/statsItem.json", SampleIsList = true>
 
     open MF.ErrorHandling.Option.Operators
 
     let getDeviceList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Device list, ApiError> =
-        let execute = asyncResult {
+        asyncResult {
             do! login io config
 
             output.Section "[Eaton] Downloading ..."
@@ -335,23 +335,164 @@ module Api =
                 try response |> DevicesSchema.Parse |> AsyncResult.ofSuccess with
                 | e -> AsyncResult.ofError (ApiError.Exception e)
 
-            devices.Result
-            |> Seq.map (fun item ->
-                [
-                    item.SerialNr <?=> "-"
-                    item.Name
-                    item.Type <?=> "-"
-                ]
-            )
-            |> Seq.toList
-            |> output.Table ["Serial Number"; "Device"; "Type"]
+            let deviceGroups =
+                devices.Result
+                |> Seq.map (fun item ->
+                    {
+                        Name = item.Name.Trim()
+                        DisplayName = ""    // todo - parse from user device list - there is a custom name
 
-            // todo - parse response
-            output.NewLine()
-            output.Message "⚠️  TODO"
+                        DeviceId = DeviceId item.DeviceUid
+                        Parent = item.ParentId <!> DeviceId
 
-            return []
+                        SerialNumber = item.SerialNr >>= parseInt <?=> 0
+
+                        Type =
+                            match item.Type with
+                            | Contains "Room Controller" -> Termostat
+                            | other -> Other other
+
+                        Rssi =
+                            match item.RssiId, item.Rssi with
+                            | Some 1, Some status -> Rssi.Enabled status
+                            | Some 0, _ -> Rssi.Disabled
+                            | other -> Rssi.Other other
+
+                        Powered =
+                            match item.PoweredId, item.Powered with
+                            | Some 6, Contains "Sítově Napájené" -> PowerStatus.Always
+                            | Some 1, Some status -> PowerStatus.Battery status
+                            | other -> PowerStatus.Other other
+
+                        Children = []
+                    }
+                )
+                // todo - remove folowing filter
+                |> Seq.filter (fun device ->
+                    let contains part = (device.Parent <?=> device.DeviceId) |> DeviceId.contains part
+                    [ "4131920"; "8649687" ] |> List.exists contains
+                )
+                |> Seq.groupBy (fun device -> device.Parent <?=> device.DeviceId)
+                |> Seq.toList
+
+            if output.IsVeryVerbose() then
+                deviceGroups
+                |> Seq.iter (fun (device, devices) ->
+                    output.Section <| sprintf "%A" device
+
+                    devices
+                    |> Seq.toList
+                    |> List.sortBy (fun device -> device.Parent <?=> device.DeviceId)
+                    |> List.map (fun device -> [
+                        device.Name
+                        device.DisplayName
+                        device.SerialNumber |> sprintf "%A"
+                        device.Type |> sprintf "%A"
+                        device.Rssi |> sprintf "%A"
+                        device.Powered |> sprintf "%A"
+                    ])
+                    |> output.Table [
+                        "Name"
+                        "DisplayName"
+                        "SerialNumber"
+                        "Type"
+                        "Rssi"
+                        "Powered"
+                    ]
+                    |> output.NewLine
+                )
+
+            let devices =
+                deviceGroups
+                |> List.fold
+                    (fun (acc: Device list) (_, devices) ->
+                        let devices = devices |> List.ofSeq
+
+                        let device =
+                            devices
+                            |> List.pick (function
+                                | { Parent = None } as main -> Some main
+                                | _ -> None
+                            )
+
+                        let device =
+                            { device with
+                                Children =
+                                    devices
+                                    |> List.choose (function
+                                        | { Parent = Some _ } as child -> Some child
+                                        | _ -> None
+                                    )
+                            }
+
+                        device :: acc
+                    )
+                    []
+
+            return devices
         }
+        |> retryOnUnathorized io config
 
-        execute
+    let getDeviceStatuses ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Map<DeviceId, DeviceStat>, ApiError> =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Get Device Statuses"
+            let! response =
+                RPC.Request.create "Diagnostics/getPhysicalDevicesWithLogStats" []
+                |> RPC.call config
+
+            output.Success "✅ Done"
+
+            output.Section "[Eaton] Parsing statuses ..."
+            let! (stats: DevicesStatusSchema.Root) =
+                try response |> DevicesStatusSchema.Parse |> AsyncResult.ofSuccess with
+                | e -> AsyncResult.ofError (ApiError.Exception e)
+
+            if output.IsVerbose() then
+                output.Message " -> <c:green>parsed</c>"
+                output.SubTitle "Parsing stats ..."
+
+            let! deviceStats =
+                stats.Result.JsonValue.Properties()
+                |> Seq.map (fun (device, value) -> result {
+                    let! parsed =
+                        try value.ToString() |> StatItemSchema.Parse |> Ok
+                        with e -> Error (ApiError.Message <| sprintf "There is an error while parsing device %A value %A:\n%A" device value e)
+
+                    return DeviceId device, {
+                        MessagesPerDay = parsed.MsgsPerDay
+                        LastMsgTimeStamp = parsed.LastMsgTimeStamp
+                        EventLog =
+                            match parsed.EventLog.Number, parsed.EventLog.String with
+                            | Some number, _ -> StatValue.Decimal number
+                            | _, Contains "ON"
+                            | _, Contains "OPEN" -> StatValue.On
+
+                            | _, Contains "OFF"
+                            | _, Contains "CLOSE" -> StatValue.Off
+
+                            | _, Some string -> StatValue.String string
+                            | _ -> parsed.EventLog.ToString() |> StatValue.String
+                    }
+                })
+                |> List.ofSeq
+                |> Validation.ofResults
+                |> Result.mapError ApiError.Errors
+
+            if output.IsVerbose() then output.Message " -> <c:green>done</c>"
+
+            if output.IsVeryVerbose() then
+                deviceStats
+                |> List.map (fun (DeviceId device, stats) -> [
+                    let error = "<c:red>err</c>"
+
+                    yield device
+                    yield try stats.EventLog |> sprintf "<c:magenta>%A</c>" with _ -> error
+                    yield try stats.LastMsgTimeStamp.ToString() |> sprintf "<c:cyan>%s</c>" with _ -> error
+                ])
+                |> output.Table [ "Device"; "Value"; "Last Updated" ]
+
+            return deviceStats |> Map.ofList
+        }
         |> retryOnUnathorized io config
