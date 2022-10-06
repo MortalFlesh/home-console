@@ -213,7 +213,7 @@ rest:
                     |> Config.parse
                     |> Option.defaultWith (fun () -> {
                         Eaton = {
-                            Host = Api <| optionValue "host"
+                            Host = optionValue "host" |> Api.create
                             Credentials = {
                                 Name = optionValue "name"
                                 Password = optionValue "password"

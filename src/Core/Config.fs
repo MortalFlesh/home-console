@@ -23,7 +23,7 @@ module Config =
 
             Some {
                 Eaton = {
-                    Host = Api $"http://{parsed.Eaton.Host}"
+                    Host = Api.create parsed.Eaton.Host
                     Credentials = {
                         Name = parsed.Eaton.Credentials.Username
                         Password = parsed.Eaton.Credentials.Password
