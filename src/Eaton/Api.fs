@@ -86,12 +86,20 @@ module Api =
 
         [<RequireQualifiedAccess>]
         module Url =
-            let asUri (Url url) = Uri url
+            let asUri (Api api) (Url url) =
+                try
+                    /// see https://stackoverflow.com/questions/2887924/invalid-uri-the-format-of-the-uri-could-not-be-determined
+                    let host = Uri api
+                    let path = Uri(url.Replace(api, ""), UriKind.Relative)
+
+                    Uri (host, path)
+                with
+                | e -> failwithf "Url %A is invalid, due to %A" url e
 
         [<RequireQualifiedAccess>]
         module Path =
             let asUri (api: Api) (path: Path) =
-                api |> path |> Url.asUri
+                api |> path |> Url.asUri api
 
         let getStream api (path: Path): AsyncResult<HttpResponseWithStream, ApiError> =
             asyncResult {

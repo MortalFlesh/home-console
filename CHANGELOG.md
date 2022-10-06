@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Fix creating an Uri
 
 ## 1.5.0 - 2022-10-06
 - Fetch live stats from an Eaton controller (for selected devices ATM)
