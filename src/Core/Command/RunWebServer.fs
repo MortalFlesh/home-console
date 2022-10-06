@@ -237,6 +237,7 @@ rest:
                 [
                     GET >=>
                         choose [
+                            // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
                             route "/"
                                 >=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
                                 >=> htmlString WebServer.index
