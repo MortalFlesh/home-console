@@ -15,9 +15,18 @@ module RunWebServerCommand =
     open MF.Utils
     open MF.Utils.Logging
     open MF.HomeConsole.Console
+    open MF.Eaton
 
     let arguments = []
-    let options = []
+    let options = [
+        Console.Option.config
+
+        Option.optional "host" None "Host IP of the eaton controller." None
+        Option.optional "name" None "Name for eaton controller." (Some "admin")
+        Option.optional "password" None "Password for eaton controller." None
+        Option.optional "cookies-path" None "Path for a credentials file." (Some "./eaton-cookies.json")
+        Option.optional "history-path" None "Path for a downloaded history directory." (Some "./eaton-history")
+    ]
 
     [<RequireQualifiedAccess>]
     module WebServer =
@@ -193,18 +202,37 @@ rest:
 
         let result: Result<_, CommandError> =
             result {
-                (* let! config =
+                let optionValue option =
+                    match input with
+                    | Input.OptionValue option value -> value
+                    | _ -> failwithf $"Missing value for {option}."
+
+                let config =
                     input
                     |> Input.config
                     |> Config.parse
-                    |> Result.ofOption (CommandError.Message "invalid config") *)
+                    |> Option.defaultWith (fun () -> {
+                        Eaton = {
+                            Host = Api <| optionValue "host"
+                            Credentials = {
+                                Name = optionValue "name"
+                                Password = optionValue "password"
+                                Path = optionValue "cookies-path"
+                            }
+                            History = {
+                                DownloadDirectory = optionValue "history-path"
+                            }
+                        }
+                    })
 
                 use loggerFactory =
-                    "debug"
+                    "normal"
                     |> LogLevel.parse
                     |> LoggerFactory.create
 
                 output.Section "Run webserver"
+
+                let mutable devicesCache: (Device list) option = None
 
                 [
                     GET >=>
@@ -214,39 +242,60 @@ rest:
                                 >=> htmlString WebServer.index
 
                             route "/sensors"
-                                >=> json {|
-                                    Sensor = {|
-                                        Temperature = 42
-                                        Id = "sensor01"
-                                        Name = "livingroom"
-                                        Connected = true
-                                    |}
-                                    Sensors = Map.ofList [
-                                        "bedroom1", {|
-                                            Temperature = 15.79
-                                            Humidity = 55.78
-                                            Battery = 5.26
-                                            Timestamp = "2019-02-27T22:21:37Z"
-                                        |}
-                                        "bedroom2", {|
-                                            Temperature = 18.99
-                                            Humidity = 49.81
-                                            Battery = 5.08
-                                            Timestamp = "2019-02-27T22:23:44Z"
-                                        |}
-                                        "bedroom3", {|
-                                            Temperature = 18.58
-                                            Humidity = 47.95
-                                            Battery = 5.15
-                                            Timestamp = "2019-02-27T22:21:22Z"
-                                        |}
-                                    ]
-                                    Time = {|
-                                        Date = "10-03-2022"
-                                        Milliseconds_since_epoch = int64 "1664802991672"
-                                        Time = "01:16:31 PM"
-                                    |}
-                                |}
+                                >=> warbler (fun ctx ->
+                                    let data =
+                                        asyncResult {
+                                            let! (devices: Device list) =
+                                                match devicesCache with
+                                                | Some cache -> AsyncResult.ofSuccess cache
+                                                | _ ->
+                                                    Api.getDeviceList (input, output) config.Eaton
+                                                    |> AsyncResult.tee (fun devices -> devicesCache <- Some devices)
+
+                                            let! (devicesStats: Map<DeviceId,DeviceStat>) =
+                                                Api.getDeviceStatuses (input, output) config.Eaton
+
+                                            let devicesToShow =
+                                                devices
+                                                |> List.filter (fun d -> d.SerialNumber = 4131920 || d.SerialNumber = 8649687)
+
+                                            let stat deviceId = devicesStats |> Map.tryFind deviceId
+
+                                            return {|
+                                                Sensors =
+                                                    devicesToShow
+                                                    |> List.collect (fun device ->
+                                                        device.Children
+                                                        |> List.map (fun device ->
+                                                            device.DeviceId |> DeviceId.id,
+                                                            Map.ofList [
+                                                                "name", device.Name
+
+                                                                match stat device.DeviceId with
+                                                                | Some value ->
+                                                                    if device.DeviceId |> DeviceId.contains "_u1"
+                                                                        then "humidity", value.EventLog |> DeviceStat.value
+                                                                    elif device.DeviceId |> DeviceId.contains "_u0"
+                                                                        then "temperature", value.EventLog |> DeviceStat.value
+                                                                    elif device.DeviceId |> DeviceId.contains "_w"
+                                                                        then "adjustment", value.EventLog |> DeviceStat.value
+                                                                    else
+                                                                        "value", value.EventLog |> DeviceStat.value
+
+                                                                    "last_update", value.LastMsgTimeStamp.ToString()
+                                                                | _ -> ()
+                                                            ]
+                                                        )
+                                                    )
+                                                    |> Map.ofList
+                                            |}
+                                        }
+                                        |> Async.RunSynchronously
+
+                                    match data with
+                                    | Ok success -> json success
+                                    | Error error -> json error
+                                )
                     ]
                 ]
                 |> WebServer.app loggerFactory

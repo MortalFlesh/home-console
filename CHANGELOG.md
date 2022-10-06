@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Fetch live stats from an Eaton controller (for selected devices ATM)
+
 ## 1.4.0 - 2022-10-03
 - Add ingress index page for Web server
 

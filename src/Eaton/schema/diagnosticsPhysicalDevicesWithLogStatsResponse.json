@@ -1,0 +1,28 @@
+[
+    {
+        "result": {
+            "hdm:Weather Service Protocol Adapter:4915000152587890616700000762939453_t": {
+                "msgsPerDay": "63",
+                "lastMsgTimeStamp": "18:34:06",
+                "eventLog": "15.0"
+            },
+            "hdm:xComfort Adapter:4116920": {
+                "msgsPerDay": "2",
+                "lastMsgTimeStamp": "18:00:52",
+                "eventLog": "318"
+            },
+            "hdm:xComfort Adapter:4129662_u0": {
+                "msgsPerDay": "2",
+                "lastMsgTimeStamp": "18:00:51",
+                "eventLog": "ON/OPEN"
+            },
+            "hdm:xComfort Adapter:8649687_w": {
+                "msgsPerDay": "33",
+                "lastMsgTimeStamp": "18:03:50",
+                "eventLog": "-4.0"
+            }
+        },
+        "id": 7,
+        "jsonrpc": "2.0"
+    }
+]

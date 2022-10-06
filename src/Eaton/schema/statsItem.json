@@ -1,0 +1,22 @@
+[
+    {
+        "msgsPerDay": "63",
+        "lastMsgTimeStamp": "18:34:06",
+        "eventLog": "15.0"
+    },
+    {
+        "msgsPerDay": "2",
+        "lastMsgTimeStamp": "18:00:52",
+        "eventLog": "318"
+    },
+    {
+        "msgsPerDay": "2",
+        "lastMsgTimeStamp": "18:00:51",
+        "eventLog": "ON/OPEN"
+    },
+    {
+        "msgsPerDay": "33",
+        "lastMsgTimeStamp": "18:03:50",
+        "eventLog": "-4.0"
+    }
+]
