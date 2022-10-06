@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Fix creating an Api
 
 ## 1.5.1 - 2022-10-06
 - Fix creating an Uri

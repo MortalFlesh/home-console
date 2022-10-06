@@ -8,6 +8,13 @@ module HttpTypes =
     type Api = Api of string
     type Path = Api -> Url
 
+    [<RequireQualifiedAccess>]
+    module Api =
+        let create (api: string) =
+            if api.StartsWith "http" then api
+            else $"http://{api}"
+            |> Api
+
 type EatonConfig = {
     Host: Api
     Credentials: Credentials
