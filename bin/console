@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+APP="home-console"
+NET="net6.0"
+
+CONSOLE="bin/Debug/$NET/$APP.dll"
+if [ ! -f "$CONSOLE" ]; then
+    CONSOLE="bin/Release/$NET/$APP.dll"
+fi
+
+dotnet "$CONSOLE" "$@"
