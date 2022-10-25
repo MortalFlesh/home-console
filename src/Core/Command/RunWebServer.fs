@@ -197,116 +197,108 @@ rest:
 </body>
 </html>"""
 
-    let execute (input, output) =
-        output.SubTitle "Starting ..."
+    let execute = executeResult <| fun (input, output) ->
+        result {
+            output.SubTitle "Starting ..."
 
-        let result: Result<_, CommandError> =
-            result {
-                let optionValue option =
-                    match input with
-                    | Input.OptionValue option value -> value
-                    | _ -> failwithf $"Missing value for {option}."
+            let optionValue option = input |> Input.Option.value option
 
-                let config =
-                    input
-                    |> Input.config
-                    |> Config.parse
-                    |> Option.defaultWith (fun () -> {
-                        Eaton = {
-                            Host = optionValue "host" |> Api.create
-                            Credentials = {
-                                Name = optionValue "name"
-                                Password = optionValue "password"
-                                Path = optionValue "cookies-path"
-                            }
-                            History = {
-                                DownloadDirectory = optionValue "history-path"
-                            }
+            let config =
+                input
+                |> Input.config
+                |> Config.parse
+                |> Option.defaultWith (fun () -> {
+                    Eaton = {
+                        Host = optionValue "host" |> Api.create
+                        Credentials = {
+                            Name = optionValue "name"
+                            Password = optionValue "password"
+                            Path = optionValue "cookies-path"
                         }
-                    })
+                        History = {
+                            DownloadDirectory = optionValue "history-path"
+                        }
+                    }
+                })
 
-                use loggerFactory =
-                    "normal"
-                    |> LogLevel.parse
-                    |> LoggerFactory.create
+            use loggerFactory =
+                "normal"
+                |> LogLevel.parse
+                |> LoggerFactory.create
 
-                output.Section "Run webserver"
+            output.Section "Run webserver"
 
-                let mutable devicesCache: (Device list) option = None
+            let mutable devicesCache: (Device list) option = None
 
-                [
-                    GET >=>
-                        choose [
-                            // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
-                            route "/"
-                                >=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
-                                >=> htmlString WebServer.index
+            [
+                GET >=>
+                    choose [
+                        // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
+                        route "/"
+                            >=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
+                            >=> htmlString WebServer.index
 
-                            route "/sensors"
-                                >=> warbler (fun ctx ->
-                                    let data =
-                                        asyncResult {
-                                            let! (devices: Device list) =
-                                                match devicesCache with
-                                                | Some cache -> AsyncResult.ofSuccess cache
-                                                | _ ->
-                                                    Api.getDeviceList (input, output) config.Eaton
-                                                    |> AsyncResult.tee (fun devices -> devicesCache <- Some devices)
+                        route "/sensors"
+                            >=> warbler (fun ctx ->
+                                let data =
+                                    asyncResult {
+                                        let! (devices: Device list) =
+                                            match devicesCache with
+                                            | Some cache -> AsyncResult.ofSuccess cache
+                                            | _ ->
+                                                Api.getDeviceList (input, output) config.Eaton
+                                                |> AsyncResult.tee (fun devices -> devicesCache <- Some devices)
 
-                                            let! (devicesStats: Map<DeviceId,DeviceStat>) =
-                                                Api.getDeviceStatuses (input, output) config.Eaton
+                                        let! (devicesStats: Map<DeviceId,DeviceStat>) =
+                                            Api.getDeviceStatuses (input, output) config.Eaton
 
-                                            let devicesToShow =
-                                                devices
-                                                |> List.filter (fun d -> d.SerialNumber = 4131920 || d.SerialNumber = 8649687)
+                                        let devicesToShow =
+                                            devices
+                                            |> List.filter (fun d -> d.SerialNumber = 4131920 || d.SerialNumber = 8649687)
 
-                                            let stat deviceId = devicesStats |> Map.tryFind deviceId
+                                        let stat deviceId = devicesStats |> Map.tryFind deviceId
 
-                                            return {|
-                                                Sensors =
-                                                    devicesToShow
-                                                    |> List.collect (fun device ->
-                                                        device.Children
-                                                        |> List.map (fun device ->
-                                                            device.DeviceId |> DeviceId.id,
-                                                            Map.ofList [
-                                                                "name", device.Name
+                                        return {|
+                                            Sensors =
+                                                devicesToShow
+                                                |> List.collect (fun device ->
+                                                    device.Children
+                                                    |> List.map (fun device ->
+                                                        device.DeviceId |> DeviceId.id,
+                                                        Map.ofList [
+                                                            "name", device.Name
 
-                                                                match stat device.DeviceId with
-                                                                | Some value ->
-                                                                    if device.DeviceId |> DeviceId.contains "_u1"
-                                                                        then "humidity", value.EventLog |> DeviceStat.value
-                                                                    elif device.DeviceId |> DeviceId.contains "_u0"
-                                                                        then "temperature", value.EventLog |> DeviceStat.value
-                                                                    elif device.DeviceId |> DeviceId.contains "_w"
-                                                                        then "adjustment", value.EventLog |> DeviceStat.value
-                                                                    else
-                                                                        "value", value.EventLog |> DeviceStat.value
+                                                            match stat device.DeviceId with
+                                                            | Some value ->
+                                                                if device.DeviceId |> DeviceId.contains "_u1"
+                                                                    then "humidity", value.EventLog |> DeviceStat.value
+                                                                elif device.DeviceId |> DeviceId.contains "_u0"
+                                                                    then "temperature", value.EventLog |> DeviceStat.value
+                                                                elif device.DeviceId |> DeviceId.contains "_w"
+                                                                    then "adjustment", value.EventLog |> DeviceStat.value
+                                                                else
+                                                                    "value", value.EventLog |> DeviceStat.value
 
-                                                                    "last_update", value.LastMsgTimeStamp.ToString()
-                                                                | _ -> ()
-                                                            ]
-                                                        )
+                                                                "last_update", value.LastMsgTimeStamp.ToString()
+                                                            | _ -> ()
+                                                        ]
                                                     )
-                                                    |> Map.ofList
-                                            |}
-                                        }
-                                        |> Async.RunSynchronously
+                                                )
+                                                |> Map.ofList
+                                        |}
+                                    }
+                                    |> Async.RunSynchronously
 
-                                    match data with
-                                    | Ok success -> json success
-                                    | Error error -> json error
-                                )
-                    ]
+                                match data with
+                                | Ok success -> json success
+                                | Error error -> json error
+                            )
                 ]
-                |> WebServer.app loggerFactory
-                |> Application.run
-            }
+            ]
+            |> WebServer.app loggerFactory
+            |> Application.run
 
-        match result with
-        | Error e ->
-            output.Error <| sprintf "%A" e
-            ExitCode.Error
-        | Ok _ ->
             output.Success "Done"
-            ExitCode.Success
+
+            return ExitCode.Success
+        }

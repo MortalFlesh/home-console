@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Update dependencies
 
 ## 1.5.2 - 2022-10-06
 - Fix creating an Api
