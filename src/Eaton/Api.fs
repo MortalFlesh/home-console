@@ -234,7 +234,7 @@ module Api =
 
         match cookies.GetCookies(loginPath |> Http.Path.asUri config.Host) with
         | eatonCookies when eatonCookies.Count > 0 ->
-            output.Success "✅ Done (already logged in)"
+            output.Success "Done (already logged in)"
             return ()
 
         | _ ->
@@ -253,7 +253,7 @@ module Api =
                 |> Result.ofOption (ApiError.Message "Missing session id cookie")
 
             do! persistCookies io config
-            output.Success "✅ Done"
+            output.Success "Done"
     }
 
     let downloadHistoryFile ((_, output) as io: IO) (config: EatonConfig) =
@@ -269,7 +269,7 @@ module Api =
             if Directory.Exists (targetDir / "configuration") then
                 Directory.Delete (targetDir / "configuration")
 
-            output.Success "✅ Done"
+            output.Success "Done"
 
         let createDownloadedFile file (contentStream: Stream) =
             asyncResult {
@@ -293,11 +293,11 @@ module Api =
 
             output.Section "[Eaton] Downloading ..."
             let! (response: HttpResponseWithStream) = Http.getStream config.Host (Http.path "/BackupRestore/History?filename=history")
-            output.Success "✅ Done"
+            output.Success "Done"
 
             output.Section "[Eaton] Create a file ..."
             do! createDownloadedFile configFile response.ResponseStream
-            output.Success "✅ Done"
+            output.Success "Done"
 
             output.Section "[Eaton] Extracting a file ..."
             try ZipFile.ExtractToDirectory(configFile, targetDir) with
@@ -307,13 +307,13 @@ module Api =
 
             if tmpHistoryFilePath |> File.Exists |> not then
                 return! Error (ApiError.Message $"History file ({tmpHistoryFilePath}) does not exists after extraction.")
-            output.Success "✅ Done"
+            output.Success "Done"
 
             output.Section "[Eaton] Move history file to its directory ..."
             let now = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss")
             let historyFilePath = targetDir / $"history_{now}.xml"
             File.Move (tmpHistoryFilePath, historyFilePath)
-            output.Success "✅ Done"
+            output.Success "Done"
 
             deleteTemporaryFiles targetDir configFile tmpHistoryFilePath
 
@@ -336,7 +336,7 @@ module Api =
                 RPC.Request.create "Diagnostics/getPhysicalDevices" []
                 |> RPC.call config
 
-            output.Success "✅ Done"
+            output.Success "Done"
 
             output.Section "[Eaton] Parsing devices ..."
             let! (devices: DevicesSchema.Root) =
@@ -450,7 +450,7 @@ module Api =
                 RPC.Request.create "Diagnostics/getPhysicalDevicesWithLogStats" []
                 |> RPC.call config
 
-            output.Success "✅ Done"
+            output.Success "Done"
 
             output.Section "[Eaton] Parsing statuses ..."
             let! (stats: DevicesStatusSchema.Root) =

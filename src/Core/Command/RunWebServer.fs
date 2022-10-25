@@ -203,11 +203,8 @@ rest:
 
             let optionValue option = input |> Input.Option.value option
 
-            let config =
-                input
-                |> Input.config
-                |> Config.parse
-                |> Option.defaultWith (fun () -> {
+            let directConfig =
+                try Some {
                     Eaton = {
                         Host = optionValue "host" |> Api.create
                         Credentials = {
@@ -219,7 +216,27 @@ rest:
                             DownloadDirectory = optionValue "history-path"
                         }
                     }
-                })
+                }
+                with e ->
+                    if output.IsVeryVerbose() then output.Warning("Config from option values is not valid: %s", e.Message)
+                    None
+
+            let! config =
+                directConfig
+                |> Option.orElseWith (fun _ ->
+                    input
+                    |> Input.config
+                    |> Config.parse
+                )
+                |> Result.ofOption (CommandError.Message "Missing configuration")
+
+            if output.IsDebug() then
+                output.Table [ "Config"; "Value" ] [
+                    [ "Eaton.Host"; config.Eaton.Host |> sprintf "%A" ]
+                    [ "Eaton.Name"; config.Eaton.Credentials.Name |> sprintf "%A" ]
+                    [ "Eaton.Path"; config.Eaton.Credentials.Path |> sprintf "%A" ]
+                    [ "Eaton.History"; config.Eaton.History.DownloadDirectory |> sprintf "%A" ]
+                ]
 
             use loggerFactory =
                 "normal"
@@ -247,7 +264,10 @@ rest:
                                             | Some cache -> AsyncResult.ofSuccess cache
                                             | _ ->
                                                 Api.getDeviceList (input, output) config.Eaton
-                                                |> AsyncResult.tee (fun devices -> devicesCache <- Some devices)
+                                                |> AsyncResult.tee (function
+                                                    | [] -> ()
+                                                    | devices -> devicesCache <- Some devices
+                                                )
 
                                         let! (devicesStats: Map<DeviceId,DeviceStat>) =
                                             Api.getDeviceStatuses (input, output) config.Eaton

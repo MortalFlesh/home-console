@@ -8,11 +8,11 @@ let main argv =
         title AssemblyVersionInformation.AssemblyProduct
         info ApplicationInfo.MainTitle
         version AssemblyVersionInformation.AssemblyVersion
-        // description AssemblyVersionInformation.AssemblyDescription
-        // meta ("BuildAt", AssemblyVersionInformation.AssemblyMetadata_createdAt)
+        description AssemblyVersionInformation.AssemblyDescription
+        meta ("BuildAt", AssemblyVersionInformation.AssemblyMetadata_createdAt)
 
-        // gitBranch AssemblyVersionInformation.AssemblyMetadata_gitbranch
-        // gitCommit AssemblyVersionInformation.AssemblyMetadata_gitcommit
+        gitBranch AssemblyVersionInformation.AssemblyMetadata_gitbranch
+        gitCommit AssemblyVersionInformation.AssemblyMetadata_gitcommit
 
         command "home:download:history" {
             Description = "Download current data from EATON app."
