@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.8.0 - 2022-10-27
 - Show index html
 - Log http context details when run with debug verbosity
 
