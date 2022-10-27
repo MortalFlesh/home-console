@@ -1,4 +1,5 @@
 FSharp.Core
 FSharp.Data
 Newtonsoft.Json
+Giraffe
 MF.ConsoleApplication

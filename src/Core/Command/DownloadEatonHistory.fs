@@ -14,30 +14,22 @@ module DownloadEatonHistory =
         Console.Option.config
     ]
 
-    let execute (input, output) =
-        output.SubTitle "Starting ..."
+    let execute = executeAsyncResult <| fun (input, output) ->
+        asyncResult {
+            output.SubTitle "Starting ..."
 
-        let result: Result<_, CommandError> =
-            asyncResult {
-                let! config =
-                    input
-                    |> Input.config
-                    |> Config.parse
-                    |> Result.ofOption (CommandError.Message "invalid config")
+            let! config =
+                input
+                |> Input.config
+                |> Config.parse
+                |> Result.ofOption (CommandError.Message "invalid config")
 
-                let! historyFilePath =
-                    config.Eaton
-                    |> Api.downloadHistoryFile (input, output)
-                    |> AsyncResult.mapError CommandError.ofEatonApiError
+            let! historyFilePath =
+                config.Eaton
+                |> Api.downloadHistoryFile (input, output)
+                |> AsyncResult.mapError CommandError.ofEatonApiError
 
-                return "Done"
-            }
-            |> Async.RunSynchronously
-
-        match result with
-        | Error e ->
-            output.Error <| sprintf "%A" e
-            ExitCode.Error
-        | Ok _ ->
             output.Success "Done"
-            ExitCode.Success
+
+            return ExitCode.Success
+        }

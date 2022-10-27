@@ -1,10 +1,6 @@
 namespace MF.HomeConsole
 
-[<RequireQualifiedAccess>]
-type CommandError =
-    | Exception of exn
-    | Message of string
-    | Errors of CommandError list
+open MF.ConsoleApplication
 
 [<RequireQualifiedAccess>]
 module CommandError =
@@ -12,3 +8,15 @@ module CommandError =
         | MF.Eaton.ApiError.Exception e -> CommandError.Exception e
         | MF.Eaton.ApiError.Message e -> CommandError.Message e
         | MF.Eaton.ApiError.Errors e -> CommandError.Errors (e |> List.map ofEatonApiError)
+
+[<AutoOpen>]
+module Execute =
+    open MF.ErrorHandling.AsyncResult.Operators
+
+    let executeAsyncResult execute =
+        ExecuteAsyncResult (execute >@> ConsoleApplicationError.CommandError)
+
+    open MF.ErrorHandling.Result.Operators
+
+    let executeResult execute =
+        ExecuteResult (execute >@> ConsoleApplicationError.CommandError)

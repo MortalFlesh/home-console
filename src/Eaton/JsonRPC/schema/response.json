@@ -1,0 +1,35 @@
+[
+    {
+        "result": {
+            "item1": {
+                "value": "63"
+            },
+            "item2": {
+                "value": "2"
+            }
+        },
+        "id": 7,
+        "jsonrpc": "2.0"
+    },
+    {
+        "result": {
+            "item1": {
+                "value": "63"
+            },
+            "item2": {
+                "value": "2"
+            }
+        },
+        "id": 7,
+        "jsonrpc": "2.0"
+    },
+    {
+        "error": {
+            "code": -32601,
+            "message": "Method not found",
+            "data": "method"
+        },
+        "id": 32,
+        "jsonrpc": "2.0"
+    }
+]

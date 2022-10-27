@@ -29,6 +29,51 @@ module RunWebServerCommand =
     ]
 
     [<RequireQualifiedAccess>]
+    module private Debug =
+        open Microsoft.AspNetCore.Http
+
+        let logCtx clientIp isHassioIngressRequest (output: MF.ConsoleApplication.Output) (ctx: HttpContext) =
+            let path = (try ctx.Request.Path.Value |> string with _ -> "-")
+
+            if path = "/favicon.ico" then ()
+            else
+            let tupleRows values =
+                values
+                |> Seq.map (fun (key, value) -> [ ""; key; value ])
+
+            let separator = [ "<c:gray>---</c>"; "<c:gray>---</c>" ]
+
+            let clientIp =
+                try
+                    ctx
+                    |> clientIp
+                    |> Option.map (sprintf "<c:cyan>%A</c>")
+                    |> Option.defaultValue "-"
+                with e ->
+                    e.Message
+                    |> sprintf "<c:red>Err: %s</c>"
+
+            let th = sprintf "<c:dark-yellow>%s</c>"
+
+            output.Table [ "Http Context"; "Value" ] [
+                [ th "ContentType"; (try ctx.Request.ContentType |> string with _ -> "-") ]
+                [ th "Host"; (try ctx.Request.Host.Value |> string with _ -> "-") ]
+                [ th "Method"; (try ctx.Request.Method |> string with _ -> "-") ]
+                [ th "Path"; path ]
+                [ th "PathBase"; (try ctx.Request.PathBase.Value |> string with _ -> "-") ]
+                [ th "QueryString"; (try ctx.Request.QueryString.Value |> string with _ -> "-") ]
+
+                separator
+
+                [ th "ClientIP"; clientIp ]
+                [ th "Is Hassio"; (if ctx |> isHassioIngressRequest then "<c:green>yes</c>" else "<c:red>no</c>") ]
+            ]
+
+            tupleRows (ctx.Request.Headers |> Seq.map (fun h -> h.Key, h.Value |> String.concat ", "))
+            |> List.ofSeq
+            |> output.GroupedOptions "-" "Headers"
+
+    [<RequireQualifiedAccess>]
     module WebServer =
         open System
         open System.Net
@@ -40,26 +85,6 @@ module RunWebServerCommand =
         open Microsoft.AspNetCore.Http
         open Microsoft.Extensions.DependencyInjection
         open Microsoft.Extensions.Logging
-
-        let app (loggerFactory: ILoggerFactory) httpHandlers = application {
-            url "http://0.0.0.0:8080/"
-            use_router (choose [
-                yield! httpHandlers
-
-                routef "/%s"
-                    (fun path -> json {| Error = "Path not found"; Path = path |})
-                    >=> setStatusCode 404
-            ])
-            memory_cache
-            use_gzip
-
-            service_config (fun services ->
-                services
-                    .AddSingleton(loggerFactory)
-                    .AddLogging()
-                    .AddGiraffe()
-            )
-        }
 
         [<RequireQualifiedAccess>]
         module Header =
@@ -145,6 +170,47 @@ module RunWebServerCommand =
 
             | _ -> false
 
+        let private notFound output =
+            (fun path ->
+                warbler (fun (next, ctx) ->
+                    ctx |> Debug.logCtx clientIP isHassioIngressRequest output
+
+                    json {| Error = "Path not found"; Path = path |}
+                )
+            )
+
+        let app (loggerFactory: ILoggerFactory) output httpHandlers = application {
+            url "http://0.0.0.0:8080/"
+            use_router (choose [
+                yield! httpHandlers
+
+                routef "/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+            ])
+            memory_cache
+            use_gzip
+
+            service_config (fun services ->
+                services
+                    .AddSingleton(loggerFactory)
+                    .AddLogging()
+                    .AddGiraffe()
+            )
+        }
+
         let accessDeniedJson: HttpHandler =
             setStatusCode 403
             >=> json {| Title = "Forbidden"; Status = 403; Detail = "Access denied." |}
@@ -197,116 +263,139 @@ rest:
 </body>
 </html>"""
 
-    let execute (input, output) =
-        output.SubTitle "Starting ..."
 
-        let result: Result<_, CommandError> =
-            result {
-                let optionValue option =
-                    match input with
-                    | Input.OptionValue option value -> value
-                    | _ -> failwithf $"Missing value for {option}."
 
-                let config =
+    let execute = executeResult <| fun (input, output) ->
+        result {
+            output.SubTitle "Starting ..."
+
+            let optionValue option = input |> Input.Option.value option
+
+            let directConfig =
+                try Some {
+                    Eaton = {
+                        Host = optionValue "host" |> Api.create
+                        Credentials = {
+                            Name = optionValue "name"
+                            Password = optionValue "password"
+                            Path = optionValue "cookies-path"
+                        }
+                        History = {
+                            DownloadDirectory = optionValue "history-path"
+                        }
+                    }
+                }
+                with e ->
+                    if output.IsVeryVerbose() then output.Warning("Config from option values is not valid: %s", e.Message)
+                    None
+
+            let! config =
+                directConfig
+                |> Option.orElseWith (fun _ ->
                     input
                     |> Input.config
                     |> Config.parse
-                    |> Option.defaultWith (fun () -> {
-                        Eaton = {
-                            Host = optionValue "host" |> Api.create
-                            Credentials = {
-                                Name = optionValue "name"
-                                Password = optionValue "password"
-                                Path = optionValue "cookies-path"
-                            }
-                            History = {
-                                DownloadDirectory = optionValue "history-path"
-                            }
-                        }
-                    })
+                )
+                |> Result.ofOption (CommandError.Message "Missing configuration")
 
-                use loggerFactory =
-                    "normal"
-                    |> LogLevel.parse
-                    |> LoggerFactory.create
-
-                output.Section "Run webserver"
-
-                let mutable devicesCache: (Device list) option = None
-
-                [
-                    GET >=>
-                        choose [
-                            // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
-                            route "/"
-                                >=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
-                                >=> htmlString WebServer.index
-
-                            route "/sensors"
-                                >=> warbler (fun ctx ->
-                                    let data =
-                                        asyncResult {
-                                            let! (devices: Device list) =
-                                                match devicesCache with
-                                                | Some cache -> AsyncResult.ofSuccess cache
-                                                | _ ->
-                                                    Api.getDeviceList (input, output) config.Eaton
-                                                    |> AsyncResult.tee (fun devices -> devicesCache <- Some devices)
-
-                                            let! (devicesStats: Map<DeviceId,DeviceStat>) =
-                                                Api.getDeviceStatuses (input, output) config.Eaton
-
-                                            let devicesToShow =
-                                                devices
-                                                |> List.filter (fun d -> d.SerialNumber = 4131920 || d.SerialNumber = 8649687)
-
-                                            let stat deviceId = devicesStats |> Map.tryFind deviceId
-
-                                            return {|
-                                                Sensors =
-                                                    devicesToShow
-                                                    |> List.collect (fun device ->
-                                                        device.Children
-                                                        |> List.map (fun device ->
-                                                            device.DeviceId |> DeviceId.id,
-                                                            Map.ofList [
-                                                                "name", device.Name
-
-                                                                match stat device.DeviceId with
-                                                                | Some value ->
-                                                                    if device.DeviceId |> DeviceId.contains "_u1"
-                                                                        then "humidity", value.EventLog |> DeviceStat.value
-                                                                    elif device.DeviceId |> DeviceId.contains "_u0"
-                                                                        then "temperature", value.EventLog |> DeviceStat.value
-                                                                    elif device.DeviceId |> DeviceId.contains "_w"
-                                                                        then "adjustment", value.EventLog |> DeviceStat.value
-                                                                    else
-                                                                        "value", value.EventLog |> DeviceStat.value
-
-                                                                    "last_update", value.LastMsgTimeStamp.ToString()
-                                                                | _ -> ()
-                                                            ]
-                                                        )
-                                                    )
-                                                    |> Map.ofList
-                                            |}
-                                        }
-                                        |> Async.RunSynchronously
-
-                                    match data with
-                                    | Ok success -> json success
-                                    | Error error -> json error
-                                )
-                    ]
+            if output.IsDebug() then
+                output.Table [ "Config"; "Value" ] [
+                    [ "Eaton.Host"; config.Eaton.Host |> sprintf "%A" ]
+                    [ "Eaton.Name"; config.Eaton.Credentials.Name |> sprintf "%A" ]
+                    [ "Eaton.Path"; config.Eaton.Credentials.Path |> sprintf "%A" ]
+                    [ "Eaton.History"; config.Eaton.History.DownloadDirectory |> sprintf "%A" ]
                 ]
-                |> WebServer.app loggerFactory
-                |> Application.run
-            }
 
-        match result with
-        | Error e ->
-            output.Error <| sprintf "%A" e
-            ExitCode.Error
-        | Ok _ ->
+            use loggerFactory =
+                "normal"
+                |> LogLevel.parse
+                |> LoggerFactory.create
+
+            output.Section "Run webserver"
+
+            let mutable devicesCache: (Device list) option = None
+            let debuCtx ctx =
+                ctx |> Debug.logCtx WebServer.clientIP WebServer.isHassioIngressRequest output
+
+            [
+                GET >=>
+                    choose [
+                        // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
+                        route "/"
+                            //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
+                            //>=> htmlString WebServer.index
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debuCtx
+
+                                text "OK"
+                            )
+
+                        route "/sensors"
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debuCtx
+
+                                let data =
+                                    asyncResult {
+                                        let! (devices: Device list) =
+                                            match devicesCache with
+                                            | Some cache -> AsyncResult.ofSuccess cache
+                                            | _ ->
+                                                Api.getDeviceList (input, output) config.Eaton
+                                                |> AsyncResult.tee (function
+                                                    | [] -> ()
+                                                    | devices -> devicesCache <- Some devices
+                                                )
+
+                                        let! (devicesStats: Map<DeviceId,DeviceStat>) =
+                                            Api.getDeviceStatuses (input, output) config.Eaton
+
+                                        let devicesToShow =
+                                            devices
+                                            |> List.filter (fun d -> d.SerialNumber = 4131920 || d.SerialNumber = 8649687)
+
+                                        let stat deviceId = devicesStats |> Map.tryFind deviceId
+
+                                        return {|
+                                            Sensors =
+                                                devicesToShow
+                                                |> List.collect (fun device ->
+                                                    device.Children
+                                                    |> List.map (fun device ->
+                                                        device.DeviceId |> DeviceId.id,
+                                                        Map.ofList [
+                                                            "name", device.Name
+
+                                                            match stat device.DeviceId with
+                                                            | Some value ->
+                                                                if device.DeviceId |> DeviceId.contains "_u1"
+                                                                    then "humidity", value.EventLog |> DeviceStat.value
+                                                                elif device.DeviceId |> DeviceId.contains "_u0"
+                                                                    then "temperature", value.EventLog |> DeviceStat.value
+                                                                elif device.DeviceId |> DeviceId.contains "_w"
+                                                                    then "adjustment", value.EventLog |> DeviceStat.value
+                                                                else
+                                                                    "value", value.EventLog |> DeviceStat.value
+
+                                                                "last_update", value.LastMsgTimeStamp.ToString()
+                                                            | _ -> ()
+                                                        ]
+                                                    )
+                                                )
+                                                |> Map.ofList
+                                        |}
+                                    }
+                                    |> Async.RunSynchronously
+
+                                match data with
+                                | Ok success -> json success
+                                | Error error -> json error
+                            )
+                ]
+            ]
+            |> WebServer.app loggerFactory output
+            |> Application.run
+
             output.Success "Done"
-            ExitCode.Success
+
+            return ExitCode.Success
+        }

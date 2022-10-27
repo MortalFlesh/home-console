@@ -1,0 +1,25 @@
+[
+    {
+        "jsonrpc": "2.0",
+        "method": "reconcile",
+        "id": 1,
+        "params": {
+            "contacts": [
+                "foo@bar.com"
+            ],
+            "intent": {
+                "purpose": "data_processing",
+                "scope": "lmc_cz"
+            }
+        }
+    },
+    {
+        "jsonrpc": "2.0",
+        "method": "method",
+        "id": 1,
+        "params": {
+            "arg1": "string",
+            "arg2": 42
+        }
+    }
+]

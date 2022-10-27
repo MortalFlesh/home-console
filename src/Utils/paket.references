@@ -2,4 +2,5 @@ FSharp.Core
 Microsoft.Extensions.Logging
 Microsoft.Extensions.Logging.Console
 NReco.Logging.File
+Newtonsoft.Json
 MF.ConsoleApplication
