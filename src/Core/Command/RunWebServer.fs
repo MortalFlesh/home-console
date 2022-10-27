@@ -180,7 +180,7 @@ module RunWebServerCommand =
             )
 
         let app (loggerFactory: ILoggerFactory) output httpHandlers = application {
-            url "http://0.0.0.0:8080/"
+            url "http://0.0.0.0:28080/"
             use_router (choose [
                 yield! httpHandlers
 
@@ -314,25 +314,48 @@ rest:
             output.Section "Run webserver"
 
             let mutable devicesCache: (Device list) option = None
-            let debuCtx ctx =
+            let debugCtx ctx =
                 ctx |> Debug.logCtx WebServer.clientIP WebServer.isHassioIngressRequest output
 
             [
                 GET >=>
                     choose [
+                        // ingress: https://github.com/sabeechen/hassio-google-drive-backup/blob/1451592e93209c844b0e871602374a0277bf07c8/hassio-google-drive-backup/dev/apiingress.py
+
                         // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
                         route "/"
                             //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
                             //>=> htmlString WebServer.index
                             >=> warbler (fun (next, ctx) ->
-                                ctx |> debuCtx
+                                ctx |> debugCtx
+
+                                text "OK"
+                            )
+
+                        route "/startingress"
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debugCtx
+
+                                text "OK"
+                            )
+
+                        route "/hassio/ingress/%s"
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debugCtx
+
+                                text "OK"
+                            )
+
+                        route "/api/hassio_ingress/%s/%s"
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debugCtx
 
                                 text "OK"
                             )
 
                         route "/sensors"
                             >=> warbler (fun (next, ctx) ->
-                                ctx |> debuCtx
+                                ctx |> debugCtx
 
                                 let data =
                                     asyncResult {

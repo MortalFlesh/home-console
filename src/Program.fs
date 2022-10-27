@@ -36,7 +36,7 @@ let main argv =
         }
 
         command "home:web:run" {
-            Description = "Run a webserver which expose sensor data on <c:yellow>http://0.0.0.0:8080/sensors</c> as a json."
+            Description = "Run a webserver which expose sensor data on <c:yellow>http://0.0.0.0:28080/sensors</c> as a json."
             Help = None
             Arguments = RunWebServerCommand.arguments
             Options = RunWebServerCommand.options
