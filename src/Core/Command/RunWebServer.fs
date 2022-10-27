@@ -33,45 +33,46 @@ module RunWebServerCommand =
         open Microsoft.AspNetCore.Http
 
         let logCtx clientIp isHassioIngressRequest (output: MF.ConsoleApplication.Output) (ctx: HttpContext) =
-            let path = (try ctx.Request.Path.Value |> string with _ -> "-")
+            if output.IsDebug() then
+                let path = (try ctx.Request.Path.Value |> string with _ -> "-")
 
-            if path = "/favicon.ico" then ()
-            else
-            let tupleRows values =
-                values
-                |> Seq.map (fun (key, value) -> [ ""; key; value ])
+                if path = "/favicon.ico" then ()
+                else
+                    let tupleRows values =
+                        values
+                        |> Seq.map (fun (key, value) -> [ ""; key; value ])
 
-            let separator = [ "<c:gray>---</c>"; "<c:gray>---</c>" ]
+                    let separator = [ "<c:gray>---</c>"; "<c:gray>---</c>" ]
 
-            let clientIp =
-                try
-                    ctx
-                    |> clientIp
-                    |> Option.map (sprintf "<c:cyan>%A</c>")
-                    |> Option.defaultValue "-"
-                with e ->
-                    e.Message
-                    |> sprintf "<c:red>Err: %s</c>"
+                    let clientIp =
+                        try
+                            ctx
+                            |> clientIp
+                            |> Option.map (sprintf "<c:cyan>%A</c>")
+                            |> Option.defaultValue "-"
+                        with e ->
+                            e.Message
+                            |> sprintf "<c:red>Err: %s</c>"
 
-            let th = sprintf "<c:dark-yellow>%s</c>"
+                    let th = sprintf "<c:dark-yellow>%s</c>"
 
-            output.Table [ "Http Context"; "Value" ] [
-                [ th "ContentType"; (try ctx.Request.ContentType |> string with _ -> "-") ]
-                [ th "Host"; (try ctx.Request.Host.Value |> string with _ -> "-") ]
-                [ th "Method"; (try ctx.Request.Method |> string with _ -> "-") ]
-                [ th "Path"; path ]
-                [ th "PathBase"; (try ctx.Request.PathBase.Value |> string with _ -> "-") ]
-                [ th "QueryString"; (try ctx.Request.QueryString.Value |> string with _ -> "-") ]
+                    output.Table [ "Http Context"; "Value" ] [
+                        [ th "ContentType"; (try ctx.Request.ContentType |> string with _ -> "-") ]
+                        [ th "Host"; (try ctx.Request.Host.Value |> string with _ -> "-") ]
+                        [ th "Method"; (try ctx.Request.Method |> string with _ -> "-") ]
+                        [ th "Path"; path ]
+                        [ th "PathBase"; (try ctx.Request.PathBase.Value |> string with _ -> "-") ]
+                        [ th "QueryString"; (try ctx.Request.QueryString.Value |> string with _ -> "-") ]
 
-                separator
+                        separator
 
-                [ th "ClientIP"; clientIp ]
-                [ th "Is Hassio"; (if ctx |> isHassioIngressRequest then "<c:green>yes</c>" else "<c:red>no</c>") ]
-            ]
+                        [ th "ClientIP"; clientIp ]
+                        [ th "Is Hassio"; (if ctx |> isHassioIngressRequest then "<c:green>yes</c>" else "<c:red>no</c>") ]
+                    ]
 
-            tupleRows (ctx.Request.Headers |> Seq.map (fun h -> h.Key, h.Value |> String.concat ", "))
-            |> List.ofSeq
-            |> output.GroupedOptions "-" "Headers"
+                    tupleRows (ctx.Request.Headers |> Seq.map (fun h -> h.Key, h.Value |> String.concat ", "))
+                    |> List.ofSeq
+                    |> output.GroupedOptions "-" "Headers"
 
     [<RequireQualifiedAccess>]
     module WebServer =
@@ -325,32 +326,10 @@ rest:
                         // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
                         route "/"
                             //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
-                            //>=> htmlString WebServer.index
                             >=> warbler (fun (next, ctx) ->
                                 ctx |> debugCtx
 
-                                text "OK"
-                            )
-
-                        route "/startingress"
-                            >=> warbler (fun (next, ctx) ->
-                                ctx |> debugCtx
-
-                                text "OK"
-                            )
-
-                        route "/hassio/ingress/%s"
-                            >=> warbler (fun (next, ctx) ->
-                                ctx |> debugCtx
-
-                                text "OK"
-                            )
-
-                        route "/api/hassio_ingress/%s/%s"
-                            >=> warbler (fun (next, ctx) ->
-                                ctx |> debugCtx
-
-                                text "OK"
+                                htmlString WebServer.index
                             )
 
                         route "/sensors"
