@@ -1,4 +1,5 @@
 open System
+open MF.ConsoleStyle
 open MF.ConsoleApplication
 open MF.HomeConsole
 

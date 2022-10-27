@@ -4,6 +4,7 @@
 ## Unreleased
 - Update dependencies
 - Prefer eaton configuration via options over `-c` option
+- Debug http context in web server
 
 ## 1.5.2 - 2022-10-06
 - Fix creating an Api

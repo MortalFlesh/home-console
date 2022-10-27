@@ -14,6 +14,7 @@ module Api =
     open MF.Utils
     open MF.Utils.Option.Operators
     open MF.ErrorHandling
+    open MF.JsonRpc
 
     type IO = MF.ConsoleApplication.IO
 
@@ -48,32 +49,6 @@ module Api =
             if output.IsVerbose() then output.Success "✅ Cookies saved"
         }
         |> AsyncResult.mapError ApiError.Exception
-
-    [<RequireQualifiedAccess>]
-    module private Serialize =
-        module private Json =
-            open Newtonsoft.Json
-            open Newtonsoft.Json.Serialization
-
-            let private options () =
-                JsonSerializerSettings (
-                    ContractResolver =
-                        DefaultContractResolver (
-                            NamingStrategy = SnakeCaseNamingStrategy()
-                        )
-                )
-
-            let serialize obj =
-                JsonConvert.SerializeObject (obj, options())
-
-            let serializePretty obj =
-                let options = options()
-                options.Formatting <- Formatting.Indented
-
-                JsonConvert.SerializeObject (obj, options)
-
-        let toJsonPretty: obj -> string = Json.serializePretty
-        let toJson: obj -> string = Json.serialize
 
     [<RequireQualifiedAccess>]
     module private Http =
@@ -166,38 +141,36 @@ module Api =
             |> AsyncResult.mapError ApiError.Exception
 
     module RPC =
-        let mutable private id = 1000
-
-        type Request<'Params> = {
-            Id: int
-            Method: string
-            Parameters: 'Params
-        }
+        let mutable private id = 0
 
         [<RequireQualifiedAccess>]
         module Request =
+            let createWithoutParameters method =
+                id <- id + 1
+                {
+                    Id = id
+                    Method = Method method
+                    Parameters = RawJsonData (JsonValue.Array [||])
+                }
+
             let create method parameters =
                 id <- id + 1
                 {
                     Id = id
-                    Method = method
+                    Method = Method method
                     Parameters = parameters
                 }
 
-        let call config request = asyncResult {
-            let rpc =
-                [
-                    "id" => (request.Id :> obj)
-                    "jsonrpc" => ("2.0" :> obj)
-                    "method" => (request.Method :> obj)
-                    "params" => (request.Parameters :> obj)
-                ]
-                |> Map.ofList
-                :> obj
+        let call config (request: Request) = asyncResult {
+            let post = Http.post config.Host (Http.path "/remote/json-rpc")
 
-            let! (response: string) =
-                rpc
-                |> Http.post config.Host (Http.path "/remote/json-rpc")
+            let! (response: Response) =
+                request
+                |> JsonRpcCall.send post
+                |> AsyncResult.mapError (function
+                    | JsonRpcCallError.RequestError e -> e
+                    | JsonRpcCallError.ResponseError e -> e |> sprintf "%A" |> ApiError.Message
+                )
 
             return response
         }
@@ -321,8 +294,8 @@ module Api =
         }
         |> retryOnUnathorized io config
 
-    type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
-    type private DevicesStatusSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesWithLogStatsResponse.json", SampleIsList = true>
+    type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json">
+    type private DevicesStatusSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesWithLogStatsResponse.json">
     type private StatItemSchema = JsonProvider<"schema/statsItem.json", SampleIsList = true>
 
     open MF.ErrorHandling.Option.Operators
@@ -332,19 +305,25 @@ module Api =
             do! login io config
 
             output.Section "[Eaton] Downloading ..."
-            let! response =
-                RPC.Request.create "Diagnostics/getPhysicalDevices" []
+            let! (response: Response) =
+                RPC.Request.createWithoutParameters "Diagnostics/getPhysicalDevices"
                 |> RPC.call config
 
             output.Success "Done"
 
             output.Section "[Eaton] Parsing devices ..."
-            let! (devices: DevicesSchema.Root) =
-                try response |> DevicesSchema.Parse |> AsyncResult.ofSuccess with
+            let! (devices: DevicesSchema.Root array) =
+                try
+                    response
+                    |> Response.tryParseResultAsJsonString
+                    |> Result.ofOption (ApiError.Message "Invalid response")
+                    |> Result.map DevicesSchema.Parse
+                    |> AsyncResult.ofResult
+                with
                 | e -> AsyncResult.ofError (ApiError.Exception e)
 
             let deviceGroups =
-                devices.Result
+                devices
                 |> Seq.map (fun item ->
                     {
                         Name = item.Name.Trim()
@@ -447,14 +426,20 @@ module Api =
 
             output.Section "[Eaton] Get Device Statuses"
             let! response =
-                RPC.Request.create "Diagnostics/getPhysicalDevicesWithLogStats" []
+                RPC.Request.createWithoutParameters "Diagnostics/getPhysicalDevicesWithLogStats"
                 |> RPC.call config
 
             output.Success "Done"
 
             output.Section "[Eaton] Parsing statuses ..."
             let! (stats: DevicesStatusSchema.Root) =
-                try response |> DevicesStatusSchema.Parse |> AsyncResult.ofSuccess with
+                try
+                    response
+                    |> Response.tryParseResultAsJsonString
+                    |> Result.ofOption (ApiError.Message "Invalid response")
+                    |> Result.map DevicesStatusSchema.Parse
+                    |> AsyncResult.ofResult
+                with
                 | e -> AsyncResult.ofError (ApiError.Exception e)
 
             if output.IsVerbose() then
@@ -462,7 +447,7 @@ module Api =
                 output.SubTitle "Parsing stats ..."
 
             let! deviceStats =
-                stats.Result.JsonValue.Properties()
+                stats.JsonValue.Properties()
                 |> Seq.map (fun (device, value) -> result {
                     let! parsed =
                         try value.ToString() |> StatItemSchema.Parse |> Ok

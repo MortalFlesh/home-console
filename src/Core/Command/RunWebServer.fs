@@ -29,6 +29,51 @@ module RunWebServerCommand =
     ]
 
     [<RequireQualifiedAccess>]
+    module private Debug =
+        open Microsoft.AspNetCore.Http
+
+        let logCtx clientIp isHassioIngressRequest (output: MF.ConsoleApplication.Output) (ctx: HttpContext) =
+            let path = (try ctx.Request.Path.Value |> string with _ -> "-")
+
+            if path = "/favicon.ico" then ()
+            else
+            let tupleRows values =
+                values
+                |> Seq.map (fun (key, value) -> [ ""; key; value ])
+
+            let separator = [ "<c:gray>---</c>"; "<c:gray>---</c>" ]
+
+            let clientIp =
+                try
+                    ctx
+                    |> clientIp
+                    |> Option.map (sprintf "<c:cyan>%A</c>")
+                    |> Option.defaultValue "-"
+                with e ->
+                    e.Message
+                    |> sprintf "<c:red>Err: %s</c>"
+
+            let th = sprintf "<c:dark-yellow>%s</c>"
+
+            output.Table [ "Http Context"; "Value" ] [
+                [ th "ContentType"; (try ctx.Request.ContentType |> string with _ -> "-") ]
+                [ th "Host"; (try ctx.Request.Host.Value |> string with _ -> "-") ]
+                [ th "Method"; (try ctx.Request.Method |> string with _ -> "-") ]
+                [ th "Path"; path ]
+                [ th "PathBase"; (try ctx.Request.PathBase.Value |> string with _ -> "-") ]
+                [ th "QueryString"; (try ctx.Request.QueryString.Value |> string with _ -> "-") ]
+
+                separator
+
+                [ th "ClientIP"; clientIp ]
+                [ th "Is Hassio"; (if ctx |> isHassioIngressRequest then "<c:green>yes</c>" else "<c:red>no</c>") ]
+            ]
+
+            tupleRows (ctx.Request.Headers |> Seq.map (fun h -> h.Key, h.Value |> String.concat ", "))
+            |> List.ofSeq
+            |> output.GroupedOptions "-" "Headers"
+
+    [<RequireQualifiedAccess>]
     module WebServer =
         open System
         open System.Net
@@ -40,26 +85,6 @@ module RunWebServerCommand =
         open Microsoft.AspNetCore.Http
         open Microsoft.Extensions.DependencyInjection
         open Microsoft.Extensions.Logging
-
-        let app (loggerFactory: ILoggerFactory) httpHandlers = application {
-            url "http://0.0.0.0:8080/"
-            use_router (choose [
-                yield! httpHandlers
-
-                routef "/%s"
-                    (fun path -> json {| Error = "Path not found"; Path = path |})
-                    >=> setStatusCode 404
-            ])
-            memory_cache
-            use_gzip
-
-            service_config (fun services ->
-                services
-                    .AddSingleton(loggerFactory)
-                    .AddLogging()
-                    .AddGiraffe()
-            )
-        }
 
         [<RequireQualifiedAccess>]
         module Header =
@@ -145,6 +170,47 @@ module RunWebServerCommand =
 
             | _ -> false
 
+        let private notFound output =
+            (fun path ->
+                warbler (fun (next, ctx) ->
+                    ctx |> Debug.logCtx clientIP isHassioIngressRequest output
+
+                    json {| Error = "Path not found"; Path = path |}
+                )
+            )
+
+        let app (loggerFactory: ILoggerFactory) output httpHandlers = application {
+            url "http://0.0.0.0:8080/"
+            use_router (choose [
+                yield! httpHandlers
+
+                routef "/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+
+                routef "/%s/%s/%s/%s"
+                    (notFound output)
+                    >=> setStatusCode 404
+            ])
+            memory_cache
+            use_gzip
+
+            service_config (fun services ->
+                services
+                    .AddSingleton(loggerFactory)
+                    .AddLogging()
+                    .AddGiraffe()
+            )
+        }
+
         let accessDeniedJson: HttpHandler =
             setStatusCode 403
             >=> json {| Title = "Forbidden"; Status = 403; Detail = "Access denied." |}
@@ -197,6 +263,8 @@ rest:
 </body>
 </html>"""
 
+
+
     let execute = executeResult <| fun (input, output) ->
         result {
             output.SubTitle "Starting ..."
@@ -246,17 +314,26 @@ rest:
             output.Section "Run webserver"
 
             let mutable devicesCache: (Device list) option = None
+            let debuCtx ctx =
+                ctx |> Debug.logCtx WebServer.clientIP WebServer.isHassioIngressRequest output
 
             [
                 GET >=>
                     choose [
                         // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
                         route "/"
-                            >=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
-                            >=> htmlString WebServer.index
+                            //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
+                            //>=> htmlString WebServer.index
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debuCtx
+
+                                text "OK"
+                            )
 
                         route "/sensors"
-                            >=> warbler (fun ctx ->
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debuCtx
+
                                 let data =
                                     asyncResult {
                                         let! (devices: Device list) =
@@ -315,7 +392,7 @@ rest:
                             )
                 ]
             ]
-            |> WebServer.app loggerFactory
+            |> WebServer.app loggerFactory output
             |> Application.run
 
             output.Success "Done"
