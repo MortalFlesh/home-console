@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.7.0 - 2022-10-27
 - Change internal port to 28080
 
 ## 1.6.0 - 2022-10-27
