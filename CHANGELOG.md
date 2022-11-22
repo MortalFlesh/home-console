@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.9.0 - 2022-11-22
 - Allow to change device state (PoC)
 
 ## 1.8.0 - 2022-10-27
