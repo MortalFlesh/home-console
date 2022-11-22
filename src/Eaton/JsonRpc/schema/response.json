@@ -31,5 +31,12 @@
         },
         "id": 32,
         "jsonrpc": "2.0"
+    },
+    {
+        "result": {
+            "status": "ok"
+        },
+        "id": 17,
+        "jsonrpc": "2.0"
     }
 ]

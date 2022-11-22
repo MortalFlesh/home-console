@@ -1,0 +1,14 @@
+### Get sensors state
+
+GET http://127.0.0.1:28080/sensors
+
+### Change device state
+
+POST http://127.0.0.1:28080/state
+Content-Type: application/json
+
+{
+    "room": "hz_3",
+    "device": "xCo:4116923_u0",
+    "density": 50
+}

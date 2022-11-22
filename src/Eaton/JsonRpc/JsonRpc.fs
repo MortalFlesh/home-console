@@ -96,8 +96,12 @@ type Request = {
 
     /// A Structured value that holds the parameter values to be used during the invocation of the method.
     /// This member MAY be omitted.
-    Parameters: RawJsonData
+    Parameters: RequestParameters
 }
+
+and RequestParameters =
+    | RawJson of RawJsonData
+    | Dto of obj
 
 /// https://www.jsonrpc.org/specification#request_object
 type RequestDto = {
@@ -125,7 +129,10 @@ module Request =
             Jsonrpc = JsonRpc.Version
             Id = request.Id
             Method = request.Method |> Method.value
-            Params = request.Parameters |> RawJsonData.parameters
+            Params =
+                match request.Parameters with
+                | RawJson data -> data |> RawJsonData.parameters
+                | Dto dto -> dto
         }
 
     type private RequestSchema = JsonProvider<"JsonRpc/schema/request.json", SampleIsList=true>
@@ -140,7 +147,7 @@ module Request =
                 Ok {
                     Id = parsed.Id
                     Method = Method parsed.Method
-                    Parameters = RawJsonData parsed.Params.JsonValue
+                    Parameters = RawJson (RawJsonData parsed.Params.JsonValue)
                 }
 
         with e ->
@@ -164,24 +171,58 @@ type ResponseError =
 module Response =
     type private ResponseSchema = JsonProvider<"JsonRpc/schema/response.json", SampleIsList=true>
 
+    type private ResponseDto = {
+        Id: int
+        Error: ResponseErrorDto option
+        Status: string option
+        ResultData: obj
+    }
+
+    and private ResponseErrorDto = {
+        Code: int
+        Message: string
+        Data: string
+    }
+
     let parse response =
         try
-            let parsed = response |> ResponseSchema.Parse
+            let (parsed: ResponseSchema.Root) = response |> ResponseSchema.Parse
 
-            match parsed.Error with
-            | Some error ->
+            let responseDto = {
+                Id = parsed.Id
+                Error =
+                    parsed.Error
+                    |> Option.map (fun error -> {
+                        Code = error.Code
+                        Message = error.Message
+                        Data = error.Data
+                    })
+                Status = parsed.Result |> Option.bind (fun result -> result.Status)
+                ResultData =
+                    match parsed.Result with
+                    | Some result -> RawJsonData result.JsonValue
+                    | _ -> RawJsonData JsonValue.Null
+            }
+
+            match responseDto with
+            | { Error = Some error } ->
                 Error (ResponseError.JsonRpcError {
                     Code = error.Code
                     Message = error.Message
                     Data = error.Data
                 })
+
+            | { Status = Some status } when status <> "ok" ->
+                Error (ResponseError.JsonRpcError {
+                    Code = 400
+                    Message = status
+                    Data = ""
+                })
+
             | _ ->
                 Ok {
-                    Id = parsed.Id
-                    Result =
-                        match parsed.Result with
-                        | Some result -> RawJsonData result.JsonValue
-                        | _ -> RawJsonData JsonValue.Null
+                    Id = responseDto.Id
+                    Result = responseDto.ResultData
                 }
 
         with e ->
@@ -326,8 +367,13 @@ module Handler =
                     |> Map.tryFind request.Method
                     |> Result.ofOption (JsonRpcErrorDto.methodNotFound request.Method)
 
+                let! parameters =
+                    match request.Parameters with
+                    | RawJson rawJson -> Ok rawJson
+                    | _ -> Error <| JsonRpcErrorDto.internalError {| Request = request; Detail = "Handle request can parse RequestParameters.RawJson only." |}
+
                 let! arguments =
-                    request.Parameters
+                    parameters
                     |> action.ParseParameters
                     |> Result.mapError JsonRpcErrorDto.invalidParams
 

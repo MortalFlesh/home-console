@@ -150,7 +150,7 @@ module Api =
                 {
                     Id = id
                     Method = Method method
-                    Parameters = RawJsonData (JsonValue.Array [||])
+                    Parameters = RawJson (RawJsonData (JsonValue.Array [||]))
                 }
 
             let create method parameters =
@@ -489,3 +489,52 @@ module Api =
             return deviceStats |> Map.ofList
         }
         |> retryOnUnathorized io config
+
+    /// Todo - this is just a prototype for a device change, density should be optional, etc..
+    type ChangeDeviceState = {
+        Room: string
+        Device: string
+        Density: int
+    }
+
+    [<RequireQualifiedAccess>]
+    module ChangeDeviceState =
+        open Microsoft.AspNetCore.Http
+
+        type private ChangeDeviceStateSchema = JsonProvider<"schema/changeStateRequest.json", SampleIsList=true>
+
+        // todo - handle errors better
+        let parse (ctx: HttpContext) = asyncResult {
+            use reader = new StreamReader(ctx.Request.Body)
+
+            let! body =
+                reader.ReadToEndAsync()
+                |> AsyncResult.ofTaskCatch string
+
+            let! parsed =
+                try body |> ChangeDeviceStateSchema.Parse |> Ok
+                with e -> Error e.Message
+
+            return {
+                Room = parsed.Room
+                Device = parsed.Device
+                Density = parsed.Density
+            }
+        }
+
+    let changeDeviceState (_, output as io) config deviceState =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Change Device State"
+            let! response =
+                [ deviceState.Room; deviceState.Device; string deviceState.Density ]
+                :> obj
+                |> Dto
+                |> RPC.Request.create "StatusControlFunction/controlDevice"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            return ()
+        }

@@ -392,7 +392,34 @@ rest:
                                 | Ok success -> json success
                                 | Error error -> json error
                             )
-                ]
+                    ]
+
+                POST >=>
+                    choose [
+                        route "/state"
+                            >=> warbler (fun (next, ctx) ->
+                                ctx |> debugCtx
+
+                                let data =
+                                    asyncResult {
+                                        let! request =
+                                            ctx
+                                            |> Api.ChangeDeviceState.parse
+                                            |> AsyncResult.mapError ApiError.Message
+
+                                        do!
+                                            request
+                                            |> Api.changeDeviceState (input, output) config.Eaton
+
+                                        return {| Status = "Ok" |}
+                                    }
+                                    |> Async.RunSynchronously
+
+                                match data with
+                                | Ok success -> json success
+                                | Error error -> json error
+                            )
+                    ]
             ]
             |> WebServer.app loggerFactory output
             |> Application.run
