@@ -3,5 +3,15 @@
         "room": "hz_3",
         "device": "xCo:4116923_u0",
         "density": 50
+    },
+    {
+        "room": "hz_3",
+        "device": "xCo:4116923_u0",
+        "state": "on"
+    },
+    {
+        "room": "hz_3",
+        "device": "xCo:4116923_u0",
+        "state": "off"
     }
 ]

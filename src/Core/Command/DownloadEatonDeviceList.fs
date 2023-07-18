@@ -24,14 +24,17 @@ module DownloadEatonDeviceList =
                 |> Config.parse
                 |> Result.ofOption (CommandError.Message "invalid config")
 
+            let! zones =
+                Api.getZoneList (input, output) config.Eaton
+                |> AsyncResult.mapError CommandError.ofEatonApiError
+
             let! devices =
-                config.Eaton
-                |> Api.getDeviceList (input, output)
+                zones
+                |> Api.getDeviceList (input, output) config.Eaton
                 |> AsyncResult.mapError CommandError.ofEatonApiError
 
             let! stats =
-                config.Eaton
-                |> Api.getDeviceStatuses (input, output)
+                Api.getDeviceStatuses (input, output) config.Eaton
                 |> AsyncResult.mapError CommandError.ofEatonApiError
 
             output.Section "Eaton devices (with current stats)"

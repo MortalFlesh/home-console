@@ -59,6 +59,9 @@ module String =
     let split (separator: string) (value: string) =
         value.Split(separator) |> Seq.toList
 
+    let replace (toReplace: string) (replacement: string) (value: string) =
+        value.Replace(toReplace, replacement)
+
     let replaceAll (replace: string list) replacement (value: string) =
         replace
         |> List.fold (fun (value: string) toRemove ->
@@ -66,6 +69,8 @@ module String =
         ) value
 
     let remove toRemove = replaceAll toRemove ""
+
+    let lower (string: string) = string.ToLower()
 
     let append suffix string =
         sprintf "%s%s" string suffix

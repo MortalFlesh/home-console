@@ -5,6 +5,8 @@ open MF.HomeConsole
 
 [<EntryPoint>]
 let main argv =
+    let port = 28080
+
     consoleApplication {
         title AssemblyVersionInformation.AssemblyProduct
         info ApplicationInfo.MainTitle
@@ -36,13 +38,13 @@ let main argv =
         }
 
         command "home:web:run" {
-            Description = "Run a webserver which expose sensor data on <c:yellow>http://0.0.0.0:28080/sensors</c> as a json."
+            Description = $"Run a webserver which expose sensor data on <c:yellow>http://0.0.0.0:{port}/sensors</c> as a json."
             Help = None
             Arguments = RunWebServerCommand.arguments
             Options = RunWebServerCommand.options
             Initialize = None
             Interact = None
-            Execute = RunWebServerCommand.execute
+            Execute = RunWebServerCommand.execute port
         }
     }
     |> run argv
