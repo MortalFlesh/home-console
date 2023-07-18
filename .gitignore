@@ -1,5 +1,3 @@
-data/
-
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -11,26 +9,33 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-AssemblyInfo.fs
-
-!bin/tests
-!bin/console
-
-# ionide
-.ionide/
 
 # Paket dependency manager
-.paket/paket.exe
+.config.*
+.paket/
+packages/
 paket-files/
 
 # FAKE - F# Make
 .fake/
+
+# Ionide
+.ionide/
+
+# Tools
+tools/
+
+# Console
+!bin/console
+AssemblyInfo.fs
+dist/
 
 # application
 dist
 data
 output
 credentials
+logs
 
 # configs
 .config.json
