@@ -164,15 +164,15 @@ let initTargets () =
             Trace.tracefn "\nZipping released files in %s ..." releaseDir
             run zipReleaseProcess "" "."
             |> Trace.tracefn "Zip result:\n%A\n"
-        else
-            Trace.tracefn "\nZip compiled files"
-            runtimeIds
-            |> List.iter (fun runtimeId ->
-                Trace.tracefn " -> zipping %s ..." runtimeId
-                let zipFile = sprintf "%s.zip" runtimeId
-                IO.File.Delete zipFile
-                Zip.zip releaseDir (releaseDir </> zipFile) !!(releaseDir </> runtimeId </> "*")
-            )
+
+        Trace.tracefn "\nZip compiled files"
+        runtimeIds
+        |> List.iter (fun runtimeId ->
+            Trace.tracefn " -> zipping %s ..." runtimeId
+            let zipFile = sprintf "%s.zip" runtimeId
+            IO.File.Delete zipFile
+            Zip.zip releaseDir (releaseDir </> zipFile) !!(releaseDir </> runtimeId </> "*")
+        )
 
     Target.create "Release" (fun _ ->
         let releaseDir = Path.getFullName releaseDir
@@ -205,6 +205,10 @@ let initTargets () =
         zipRelease releaseDir
     )
 
+    Target.create "ZipRelease" (fun _ ->
+        zipRelease releaseDir
+    )
+
     Target.create "Watch" (fun _ ->
         Dotnet.runInRootOrFail "watch run"
     )
@@ -224,6 +228,7 @@ let initTargets () =
             ==> "Lint"
             ==> "Tests"
             ==> "Release"
+            ==> "ZipRelease"
 
         "Build"
             ==> "Watch" <=> "Run"
