@@ -52,16 +52,19 @@ let runtimeIds =
 
 [<RequireQualifiedAccess>]
 module ProjectSources =
-    let release =
+    let sources =
         !! "./*.fsproj"
         ++ "src/*.fsproj"
         ++ "src/**/*.fsproj"
+
+    let release =
+        sources |> Seq.head
 
     let tests =
         !! "tests/*.fsproj"
 
     let all =
-        release
+        sources
         ++ "tests/*.fsproj"
         ++ "build/*.fsproj"
 
@@ -189,8 +192,11 @@ let initTargets () =
         |> Seq.iter File.delete
 
         Trace.tracefn "\nPublish current release"
-        ProjectSources.release
-        |> Seq.collect (fun project -> runtimeIds |> List.collect (fun runtimeId -> [project, runtimeId]))
+
+        seq {
+            let project = ProjectSources.release
+            yield! runtimeIds |> List.collect (fun runtimeId -> [project, runtimeId])
+        }
         |> Seq.iter (fun (project, runtimeId) ->
             sprintf "publish -c Release /p:PublishSingleFile=true -o %s/%s --self-contained -r %s %s" releaseDir runtimeId runtimeId project
             |> Dotnet.runInRootOrFail
