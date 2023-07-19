@@ -734,7 +734,9 @@ module Api =
             | Some state ->
                 match state.Number, state.String with
                 | Some number, _ -> number > (decimal 0)
-                | _, Some string -> string = "ON"
+                | _, Some string ->
+                    let lower = string.ToLower()
+                    lower = "on" || lower = "open"
                 | _ -> false
             | _ -> false
 
