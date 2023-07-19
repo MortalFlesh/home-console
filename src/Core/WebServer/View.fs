@@ -93,10 +93,10 @@ module View =
                                         $"      {name}:"
                                         $"        unique_id: {name}"
                                         $"        friendly_name: \"{sensor.Name}\""
-                                        $"        value_template: \"{{ state_attr('sensor.{name}', '{deviceId}')['{valueType}'] | float }}\""
+                                        $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{valueType}'] | float }}\""
                                         $"        unit_of_measurement: \"{unitOfMeassurement}\""
                                         $"        device_class: {valueType}"
-                                        $"        entity_id: sensor.{name}"
+                                        "        entity_id: sensor.eaton"
                                     ]
                                 )
                             )
@@ -110,11 +110,27 @@ module View =
             Off: string
         }
 
-        let private switchesRow currentHost devices =
+        let private switchesRow currentHost (scenes: Scene list) devices =
             div [ _class "row" ] [
                 div [ _class "col-md-12" ] [
                     [
                         "switch:"
+
+                        yield!
+                            scenes
+                            |> List.collect (fun scene ->
+                                let sceneId = scene.Id |> SceneId.value
+                                let room = scene.Zone |> ZoneId.value
+
+                                [
+                                    "  - platform: rest"
+                                    $"    name: Eaton - scene - {scene.Name}"
+                                    $"    resource: http://{currentHost}/triggerScene"
+                                    sprintf "    body_on: '{\"room\": \"%s\", \"scene\": \"%s\"}'" room sceneId
+                                    "    headers:"
+                                    "      Content-Type: application/json"
+                                ]
+                            )
 
                         yield!
                             devices
@@ -149,6 +165,7 @@ module View =
         type IndexParameters = {
             CurrentHost: string
             Devices: Device list
+            Scenes: Scene list
         }
 
         let index parameters =
@@ -172,7 +189,7 @@ module View =
 
                                 parameters.Devices
                                 |> List.filter Device.isSwitch
-                                |> switchesRow parameters.CurrentHost
+                                |> switchesRow parameters.CurrentHost parameters.Scenes
                             ]
                         ]
                     ]

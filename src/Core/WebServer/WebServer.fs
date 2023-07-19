@@ -80,16 +80,36 @@ module WebServer =
             }
     }
 
+    let mutable scenesCache: (Scene list) option = None
+    let private loadScenes (input, output) config = asyncResult {
+        return!
+            match scenesCache with
+            | Some cache -> AsyncResult.ofSuccess cache
+            | _ -> asyncResult {
+                let! zones = loadZones (input, output) config
+
+                return!
+                    zones
+                    |> Api.getSceneList (input, output) config.Eaton
+                    |> AsyncResult.tee (function
+                        | [] -> ()
+                        | scenes -> scenesCache <- Some scenes
+                    )
+            }
+    }
+
     let private index port: Action<_> = fun (input, output) config ctx -> asyncResult {
         // todo - allow to change this by query parameter
         let showAll = false
 
         let! (devices: Device list) = loadDevices (input, output) config
+        let! (scenes: Scene list) = loadScenes (input, output) config
         let host = ctx.Request.Host.Host
 
         return View.Html.index {
             CurrentHost = $"{host}:{port}"
             Devices = devices
+            Scenes = scenes
         }
     }
 
@@ -141,6 +161,19 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private triggerScene: Action<_> = fun (input, output) config ctx -> asyncResult {
+        let! request =
+            ctx
+            |> Api.TriggerScene.parse
+            |> AsyncResult.mapError ApiError.Message
+
+        do!
+            request
+            |> Api.triggerScene (input, output) config.Eaton
+
+        return {| Status = "Ok" |}
+    }
+
     let private handleJsonAction (input, output) config (action: Action<_>) next ctx = task {
         ctx |> Debug.logCtx HttpContext.clientIP HttpContext.isHassioIngressRequest output
 
@@ -177,6 +210,9 @@ module WebServer =
             POST >=> choose [
                 route "/state"
                     >=> handleJsonAction changeDeviceState
+
+                route "/triggerScene"
+                    >=> handleJsonAction triggerScene
             ]
         ]
         |> app loggerFactory output port

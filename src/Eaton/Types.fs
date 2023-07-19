@@ -118,6 +118,18 @@ type History = {
     Data: string list
 }
 
+type Scene = {
+    Id: SceneId
+    Zone: ZoneId
+    Name: string
+}
+
+and SceneId = SceneId of string
+
+[<RequireQualifiedAccess>]
+module SceneId =
+    let value (SceneId value) = value
+
 [<RequireQualifiedAccess>]
 module ZoneId =
     let value (ZoneId value) = value

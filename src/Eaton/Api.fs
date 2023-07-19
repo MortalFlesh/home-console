@@ -264,7 +264,7 @@ module Api =
 
             do! login io config
 
-            output.Section "[Eaton] Downloading ..."
+            output.Section "[Eaton] Downloading history ..."
             let! (response: HttpResponseWithStream) = Http.getStream config.Host (Http.path "/BackupRestore/History?filename=history")
             output.Success "Done"
 
@@ -299,6 +299,7 @@ module Api =
     type private StatItemSchema = JsonProvider<"schema/statsItem.json", SampleIsList = true>
     type private ZoneItemSchema = JsonProvider<"schema/zoneItem.json", SampleIsList = true>
     type private DeviceInZoneItemSchema = JsonProvider<"schema/deviceInZoneItem.json", SampleIsList = true>
+    type private SceneItemSchema = JsonProvider<"schema/sceneItem.json", SampleIsList = true>
 
     open MF.ErrorHandling.Option.Operators
 
@@ -306,7 +307,7 @@ module Api =
         asyncResult {
             do! login io config
 
-            output.Section "[Eaton] Downloading ..."
+            output.Section "[Eaton] Downloading zones ..."
             let! (response: Response) =
                 RPC.Request.createWithoutParameters "HFM/getZones"
                 |> RPC.call config
@@ -385,7 +386,7 @@ module Api =
         asyncResult {
             do! login io config
 
-            output.Section "[Eaton] Downloading ..."
+            output.Section "[Eaton] Downloading devices ..."
             let! (response: Response) =
                 RPC.Request.createWithoutParameters "Diagnostics/getPhysicalDevices"
                 |> RPC.call config
@@ -605,6 +606,71 @@ module Api =
         }
         |> retryOnUnathorized io config
 
+    let getSceneList ((_, output) as io: IO) (config: EatonConfig) (zones: Zone list): AsyncResult<Scene list, ApiError> =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Downloading scenes ..."
+            let! (response: Response) =
+                [ true ]    // not sure what it is
+                :> obj
+                |> Dto
+                |> RPC.Request.create "SceneFunction/getDashboardTiles"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            let zoneMap = zones |> List.map (fun zone -> zone.Id, zone) |> Map.ofList
+
+            output.Section "[Eaton] Parsing scenes ..."
+            let! scenes =
+                response
+                |> Response.tryParseResultAsJsonList
+                |> List.map (fun item -> asyncResult {
+                    let! parsed =
+                        try item |> SceneItemSchema.Parse |> Ok
+                        with e -> Error (ApiError.Exception e)
+
+                    let! (zoneId, sceneId) =
+                        parsed.Actions
+                        |> Seq.tryFind (fun action -> action.ActionMethod = "SceneFunction/triggerScene")
+                        |> Option.bind (fun action ->
+                            match action.ActionParams with
+                            | [| zoneId; sceneId |] ->
+                                let zoneId = ZoneId zoneId
+
+                                if zoneId |> zoneMap.ContainsKey
+                                then Some (zoneId, SceneId sceneId)
+                                else None
+                            | _ -> None
+                        )
+                        |> Result.ofOption (ApiError.Message "Invalid action parameters")
+
+                    return {
+                        Id = sceneId
+                        Name = parsed.Data.Texts |> Seq.head
+                        Zone = zoneId
+                    }
+                })
+                |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
+                |> AsyncResult.mapError ApiError.Errors
+
+            if output.IsVeryVerbose() then
+                let zoneNameMap = zones |> List.map (fun zone -> zone.Id, zone.Name) |> Map.ofList
+
+                scenes
+                |> List.map (fun scene -> [
+                    scene.Zone |> ZoneId.value
+                    zoneNameMap[scene.Zone]
+                    scene.Id |> SceneId.value
+                    scene.Name
+                ])
+                |> output.Table [ "Zone ID"; "Zone"; "Scene ID"; "Scene" ]
+
+            return scenes
+        }
+        |> retryOnUnathorized io config
+
     type ChangeDeviceState = {
         Room: ZoneId
         Device: DeviceId
@@ -676,6 +742,55 @@ module Api =
                 :> obj
                 |> Dto
                 |> RPC.Request.create "StatusControlFunction/controlDevice"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            return ()
+        }
+
+    type TriggerScene = {
+        Room: ZoneId
+        Scene: SceneId
+    }
+
+    [<RequireQualifiedAccess>]
+    module TriggerScene =
+        open Microsoft.AspNetCore.Http
+
+        type private TriggerSceneSchema = JsonProvider<"schema/triggerSceneRequest.json", SampleIsList=true>
+
+        // todo - handle errors better
+        let parse (ctx: HttpContext) = asyncResult {
+            use reader = new StreamReader(ctx.Request.Body)
+
+            let! body =
+                reader.ReadToEndAsync()
+                |> AsyncResult.ofTaskCatch string
+
+            let! parsed =
+                try body |> TriggerSceneSchema.Parse |> Ok
+                with e -> Error e.Message
+
+            return {
+                Room = ZoneId parsed.Room
+                Scene = SceneId parsed.Scene
+            }
+        }
+
+    let triggerScene (_, output as io) config triggerScene =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Trigger Scene"
+            let! response =
+                [
+                    triggerScene.Room |> ZoneId.value
+                    triggerScene.Scene |> SceneId.value
+                ]
+                :> obj
+                |> Dto
+                |> RPC.Request.create "SceneFunction/triggerScene"
                 |> RPC.call config
 
             output.Success "Done"

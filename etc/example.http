@@ -29,3 +29,10 @@ POST http://127.0.0.1:28080/state
 Content-Type: application/json
 
 {"room": "hz_1", "device": "xCo:4291880_u0", "density": 60}
+
+### Trigger scene
+
+POST http://127.0.0.1:28080/triggerScene
+Content-Type: application/json
+
+{"room": "hz_1", "scene": "MA7"}
