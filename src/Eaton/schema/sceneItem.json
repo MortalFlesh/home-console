@@ -1,0 +1,24 @@
+[
+    {
+        "tileType": "iconText",
+        "data": {
+            "texts": [
+                "Scene Name"
+            ]
+        },
+        "icon": "Shading1",
+        "settingsActions": [],
+        "id": 149031062,
+        "actions": [
+            {
+                "actionMethod": "SceneFunction/triggerScene",
+                "actionParams": [
+                    "hz_1",
+                    "MA2"
+                ],
+                "actionCode": "JSON-RPC"
+            }
+        ],
+        "backgroundType": "normal"
+    }
+]

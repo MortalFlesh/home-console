@@ -264,7 +264,7 @@ module Api =
 
             do! login io config
 
-            output.Section "[Eaton] Downloading ..."
+            output.Section "[Eaton] Downloading history ..."
             let! (response: HttpResponseWithStream) = Http.getStream config.Host (Http.path "/BackupRestore/History?filename=history")
             output.Success "Done"
 
@@ -294,17 +294,99 @@ module Api =
         }
         |> retryOnUnathorized io config
 
-    type private DevicesSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json">
+    type private DeviceItemSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
     type private DevicesStatusSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesWithLogStatsResponse.json">
     type private StatItemSchema = JsonProvider<"schema/statsItem.json", SampleIsList = true>
+    type private ZoneItemSchema = JsonProvider<"schema/zoneItem.json", SampleIsList = true>
+    type private DeviceInZoneItemSchema = JsonProvider<"schema/deviceInZoneItem.json", SampleIsList = true>
+    type private SceneItemSchema = JsonProvider<"schema/sceneItem.json", SampleIsList = true>
 
     open MF.ErrorHandling.Option.Operators
 
-    let getDeviceList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Device list, ApiError> =
+    let getZoneList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Zone list, ApiError> =
         asyncResult {
             do! login io config
 
-            output.Section "[Eaton] Downloading ..."
+            output.Section "[Eaton] Downloading zones ..."
+            let! (response: Response) =
+                RPC.Request.createWithoutParameters "HFM/getZones"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            let devicesInZone (zone: Zone) = asyncResult {
+                output.Message <| sprintf "<c:dark-yellow>[Eaton] Downloading devices in zone</c> %A [<c:cyan>%s</c>] ..." zone.Name (zone.Id |> ZoneId.value)
+
+                let! (response: Response) =
+                    [ zone.Id |> ZoneId.value ]
+                    :> obj
+                    |> Dto
+                    |> RPC.Request.create "XDC/getDevices"
+                    |> RPC.call config
+
+                let! devicesInZone =
+                    response
+                    |> Response.tryParseResultAsJsonList
+                    |> List.map (fun item ->
+                        try
+                            let parsed = item |> DeviceInZoneItemSchema.Parse
+                            Ok {
+                                DeviceId = DeviceId parsed.DeviceId
+                                Name = parsed.DeviceName
+                            }
+                        with e -> Error (ApiError.Exception e)
+                    )
+                    |> Validation.ofResults
+                    |> Result.mapError ApiError.Errors
+
+                output.Message "<c:green> -> done</c>"
+                return devicesInZone
+            }
+
+            output.Section "[Eaton] Parsing zones ..."
+            let! zones =
+                response
+                |> Response.tryParseResultAsJsonList
+                |> List.map (fun item -> asyncResult {
+                    let! zone =
+                        try
+                            let parsed = item |> ZoneItemSchema.Parse
+                            Ok {
+                                Id = ZoneId parsed.ZoneId
+                                Name = parsed.ZoneName
+                                Devices = []
+                            }
+                        with e -> Error (ApiError.Exception e)
+
+                    let! devicesInZone = devicesInZone zone
+
+                    return { zone with Devices = devicesInZone }
+                })
+                |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
+                |> AsyncResult.mapError ApiError.Errors
+
+            if output.IsVeryVerbose() then
+                zones
+                |> List.collect (fun zone ->
+                    zone.Devices
+                    |> List.map (fun device -> [
+                        zone.Id |> ZoneId.value
+                        zone.Name
+                        device.DeviceId |> DeviceId.value
+                        device.Name
+                    ])
+                )
+                |> output.Table [ "Zone ID"; "Zone"; "Device ID" ;"Device" ]
+
+            return zones
+        }
+        |> retryOnUnathorized io config
+
+    let getDeviceList ((_, output) as io: IO) (config: EatonConfig) (zones: Zone list): AsyncResult<Device list, ApiError> =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Downloading devices ..."
             let! (response: Response) =
                 RPC.Request.createWithoutParameters "Diagnostics/getPhysicalDevices"
                 |> RPC.call config
@@ -312,109 +394,143 @@ module Api =
             output.Success "Done"
 
             output.Section "[Eaton] Parsing devices ..."
-            let! (devices: DevicesSchema.Root array) =
+            let! (devices: DeviceItemSchema.Root list) =
                 try
                     response
-                    |> Response.tryParseResultAsJsonString
-                    |> Result.ofOption (ApiError.Message "Invalid response")
-                    |> Result.map DevicesSchema.Parse
-                    |> AsyncResult.ofResult
+                    |> Response.tryParseResultAsJsonList
+                    |> tee (fun response -> if output.IsDebug() then output.Message <| sprintf "<c:dark-yellow>[Eaton] Response</c>\n - %s\n" (response |> String.concat "\n - "))
+                    |> List.map (fun item ->
+                        try DeviceItemSchema.Parse item |> Ok
+                        with e -> Error (ApiError.Exception e)
+                    )
+                    |> Validation.ofResults
+                    |> Result.mapError ApiError.Errors
                 with
-                | e -> AsyncResult.ofError (ApiError.Exception e)
+                | e -> Error (ApiError.Exception e)
 
-            let deviceGroups =
+            let zoneMap = zones |> List.collect (fun zone -> zone.Devices |> List.map (fun device -> device.DeviceId, zone.Id)) |> Map.ofList
+
+            let mainDevices =
                 devices
-                |> Seq.map (fun item ->
+                |> List.filter (fun item -> item.ParentId |> Option.isNone)
+                |> List.map (fun item ->
+                    let deviceId = DeviceId item.DeviceUid
+                    if output.IsDebug() then output.Message <| sprintf "<c:dark-yellow>[Eaton] Raw device (main)</c>\n%A\n - Rssi: %A\n - Powerd: %A\n - SR: %A" item (item.RssiId, item.Rssi) (item.PoweredId, item.Powered) item.SerialNr
+
                     {
                         Name = item.Name.Trim()
                         DisplayName = ""    // todo - parse from user device list - there is a custom name
 
-                        DeviceId = DeviceId item.DeviceUid
+                        DeviceId = deviceId
                         Parent = item.ParentId <!> DeviceId
 
                         SerialNumber = item.SerialNr >>= parseInt <?=> 0
 
-                        Type =
-                            match item.Type with
-                            | Contains "Room Controller" -> Termostat
-                            | other -> Other other
-
-                        Rssi =
-                            match item.RssiId, item.Rssi with
-                            | Some 1, Some status -> Rssi.Enabled status
-                            | Some 0, _ -> Rssi.Disabled
-                            | other -> Rssi.Other other
-
-                        Powered =
-                            match item.PoweredId, item.Powered with
-                            | Some 6, Contains "Sítově Napájené" -> PowerStatus.Always
-                            | Some 1, Some status -> PowerStatus.Battery status
-                            | other -> PowerStatus.Other other
+                        Type = item.Type |> DeviceType.parseMainType
+                        Rssi = (item.RssiId, item.Rssi) |> Rssi.parse
+                        Powered = (item.PoweredId, item.Powered) |> Powered.parse
 
                         Children = []
+
+                        Zone = zoneMap |> Map.tryFind deviceId
                     }
                 )
-                // todo - remove folowing filter
-                |> Seq.filter (fun device ->
-                    let contains part = (device.Parent <?=> device.DeviceId) |> DeviceId.contains part
-                    [ "4131920"; "8649687" ] |> List.exists contains
-                )
-                |> Seq.groupBy (fun device -> device.Parent <?=> device.DeviceId)
-                |> Seq.toList
 
-            if output.IsVeryVerbose() then
-                deviceGroups
-                |> Seq.iter (fun (device, devices) ->
-                    output.Section <| sprintf "%A" device
+            let children =
+                let mainDeviceMap =
+                    mainDevices
+                    |> List.map (fun device -> device.DeviceId, device)
+                    |> Map.ofList
 
-                    devices
-                    |> Seq.toList
-                    |> List.sortBy (fun device -> device.Parent <?=> device.DeviceId)
-                    |> List.map (fun device -> [
-                        device.Name
-                        device.DisplayName
-                        device.SerialNumber |> sprintf "%A"
-                        device.Type |> sprintf "%A"
-                        device.Rssi |> sprintf "%A"
-                        device.Powered |> sprintf "%A"
-                    ])
-                    |> output.Table [
-                        "Name"
-                        "DisplayName"
-                        "SerialNumber"
-                        "Type"
-                        "Rssi"
-                        "Powered"
-                    ]
-                    |> output.NewLine
+                devices
+                |> List.choose (fun item ->
+                    match item.ParentId with
+                    | Some parentId ->
+                        match mainDeviceMap |> Map.tryFind (DeviceId parentId) with
+                        | Some parent -> Some (parent, item)
+                        | None -> None
+                    | None -> None
                 )
+                |> List.map (fun (parent, item) ->
+                    let deviceId = DeviceId item.DeviceUid
+
+                    {
+                        Name = item.Name.Trim()
+                        DisplayName = ""    // todo - parse from user device list - there is a custom name
+
+                        DeviceId = deviceId
+                        Parent = item.ParentId <!> DeviceId
+                        SerialNumber = item.SerialNr >>= parseInt <?=> 0
+                        Type = (parent.Type, item.Type) |> DeviceType.parseChildType deviceId
+                        Rssi = (item.RssiId, item.Rssi) |> Rssi.tryParse <?=> parent.Rssi
+                        Powered = (item.PoweredId, item.Powered) |> Powered.tryParse <?=> parent.Powered
+
+                        Children = []
+
+                        Zone = zoneMap |> Map.tryFind deviceId
+                    }
+                )
+                |> List.groupBy (fun device -> device.Parent <?=> device.DeviceId)
+                |> Map.ofList
 
             let devices =
-                deviceGroups
-                |> List.fold
-                    (fun (acc: Device list) (_, devices) ->
-                        let devices = devices |> List.ofSeq
+                mainDevices
+                |> List.fold (fun acc device ->
+                    let children =
+                        children
+                        |> Map.tryFind device.DeviceId
+                        |> Option.defaultValue []
 
-                        let device =
-                            devices
-                            |> List.pick (function
-                                | { Parent = None } as main -> Some main
-                                | _ -> None
-                            )
+                    let zone =
+                        match device.Zone with
+                        | Some zone -> Some zone
+                        | _ ->
+                            let candidate = children |> List.tryPick (fun device -> device.Zone)
 
-                        let device =
-                            { device with
-                                Children =
-                                    devices
-                                    |> List.choose (function
-                                        | { Parent = Some _ } as child -> Some child
-                                        | _ -> None
-                                    )
-                            }
+                            if children |> List.forall (fun device -> device.Zone = candidate) then candidate
+                            else None
 
-                        device :: acc
-                    )
-                    []
+                    { device with Children = children; Zone = zone } :: acc
+                ) []
+
+            if output.IsVeryVerbose() then
+                let zoneNameMap = zones |> List.map (fun zone -> Some zone.Id, zone.Name) |> Map.ofList
+
+                let fields = [
+                    "Role"
+                    "Name"
+                    "DisplayName"
+                    "SerialNumber"
+                    "Type"
+                    "Rssi"
+                    "Powered"
+                    "Zone ID"
+                    "Zone"
+                ]
+
+                let values (device: Device) = [
+                    if device.Parent |> Option.isNone then "<c:green>Main</c>" else "<c:cyan>Child</c>"
+                    device.Name
+                    device.DisplayName
+                    device.SerialNumber |> sprintf "%A"
+                    device.Type |> sprintf "%A"
+                    device.Rssi |> sprintf "%A"
+                    device.Powered |> sprintf "%A"
+                    device.Zone |> Option.map ZoneId.value |> Option.defaultValue "N/A"
+                    zoneNameMap |> Map.tryFind device.Zone |> Option.defaultValue "N/A"
+                ]
+
+                devices
+                |> List.iter (fun device ->
+                    output.Section <| sprintf "%A" device.DeviceId
+
+                    device :: device.Children
+                    |> Seq.toList
+                    |> List.sortBy (fun device -> device.Parent <?=> device.DeviceId)
+                    |> List.map values
+                    |> output.Table fields
+                    |> output.NewLine
+                )
 
             return devices
         }
@@ -459,11 +575,11 @@ module Api =
                         EventLog =
                             match parsed.EventLog.Number, parsed.EventLog.String with
                             | Some number, _ -> StatValue.Decimal number
-                            | _, Contains "ON"
-                            | _, Contains "OPEN" -> StatValue.On
+                            | _, String.OptionContains "ON"
+                            | _, String.OptionContains "OPEN" -> StatValue.On
 
-                            | _, Contains "OFF"
-                            | _, Contains "CLOSE" -> StatValue.Off
+                            | _, String.OptionContains "OFF"
+                            | _, String.OptionContains "CLOSE" -> StatValue.Off
 
                             | _, Some string -> StatValue.String string
                             | _ -> parsed.EventLog.ToString() |> StatValue.String
@@ -490,11 +606,141 @@ module Api =
         }
         |> retryOnUnathorized io config
 
-    /// Todo - this is just a prototype for a device change, density should be optional, etc..
+    let getSceneList ((_, output) as io: IO) (config: EatonConfig) (zones: Zone list): AsyncResult<Scene list, ApiError> =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Downloading scenes ..."
+            let! (response: Response) =
+                [ true ]    // not sure what it is
+                :> obj
+                |> Dto
+                |> RPC.Request.create "SceneFunction/getDashboardTiles"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            let zoneMap = zones |> List.map (fun zone -> zone.Id, zone) |> Map.ofList
+
+            output.Section "[Eaton] Parsing scenes ..."
+            let! scenes =
+                response
+                |> Response.tryParseResultAsJsonList
+                |> List.map (fun item -> asyncResult {
+                    let! parsed =
+                        try item |> SceneItemSchema.Parse |> Ok
+                        with e -> Error (ApiError.Exception e)
+
+                    let! (zoneId, sceneId) =
+                        parsed.Actions
+                        |> Seq.tryFind (fun action -> action.ActionMethod = "SceneFunction/triggerScene")
+                        |> Option.bind (fun action ->
+                            match action.ActionParams with
+                            | [| zoneId; sceneId |] ->
+                                let zoneId = ZoneId zoneId
+
+                                if zoneId |> zoneMap.ContainsKey
+                                then Some (zoneId, SceneId sceneId)
+                                else None
+                            | _ -> None
+                        )
+                        |> Result.ofOption (ApiError.Message "Invalid action parameters")
+
+                    return {
+                        Id = sceneId
+                        Name = parsed.Data.Texts |> Seq.head
+                        Zone = zoneId
+                    }
+                })
+                |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
+                |> AsyncResult.mapError ApiError.Errors
+
+            if output.IsVeryVerbose() then
+                let zoneNameMap = zones |> List.map (fun zone -> zone.Id, zone.Name) |> Map.ofList
+
+                scenes
+                |> List.map (fun scene -> [
+                    scene.Zone |> ZoneId.value
+                    zoneNameMap[scene.Zone]
+                    scene.Id |> SceneId.value
+                    scene.Name
+                ])
+                |> output.Table [ "Zone ID"; "Zone"; "Scene ID"; "Scene" ]
+
+            return scenes
+        }
+        |> retryOnUnathorized io config
+
     type ChangeDeviceState = {
-        Room: string
-        Device: string
-        Density: int
+        Room: ZoneId
+        Device: DeviceId
+        State: DeviceState
+    }
+
+    and DeviceState =
+        | Density of int
+        | On | Off
+        | Toggle
+        | Open | Close | Stop | StepOpen | StepClose    // ShutterActuator
+
+    [<RequireQualifiedAccess>]
+    module DeviceState =
+        let value = function
+            | Density density -> string density
+
+            | On -> "on"
+            | Off -> "off"
+            | Toggle -> "toggle"
+
+            | Open -> "open"
+            | Close -> "close"
+            | Stop -> "stop"
+            | StepOpen -> "stepOpen"
+            | StepClose -> "stepClose"
+
+    type private GetDeviceStateSchema = JsonProvider<"schema/getDeviceStateResponse.json", SampleIsList=true>
+
+    let getDeviceState (_, output as io) config (zone, deviceId) = asyncResult {
+        do! login io config
+
+        output.Section "[Eaton] Get Device State"
+        let! response =
+            [
+                zone |> ZoneId.value
+                ""
+            ]
+            :> obj
+            |> Dto
+            |> RPC.Request.create "StatusControlFunction/getDevices"
+            |> RPC.call config
+
+        let stateValue =
+            response
+            |> Response.tryParseResultAsJsonList
+            |> List.tryPick (fun state ->
+                try
+                    let parsed = state |> GetDeviceStateSchema.Parse
+
+                    if parsed.Id = (deviceId |> DeviceId.shortId) then Some parsed.Value
+                    else None
+                with e -> None
+            )
+
+        if output.IsVeryVerbose() then
+            output.Message("<c:gray>[Debug]</c> Response for %A in %A stateValue: <c:magenta>%A</c>", deviceId |> DeviceId.shortId, zone |> ZoneId.value, stateValue)
+
+        let isOn =
+            match stateValue with
+            | Some state ->
+                match state.Number, state.String with
+                | Some number, _ -> number > (decimal 0)
+                | _, Some string -> string = "ON"
+                | _ -> false
+            | _ -> false
+
+        output.Success "Done"
+
+        return isOn
     }
 
     [<RequireQualifiedAccess>]
@@ -515,23 +761,85 @@ module Api =
                 try body |> ChangeDeviceStateSchema.Parse |> Ok
                 with e -> Error e.Message
 
+            let! state =
+                match parsed.Density, parsed.State with
+                | Some density, _ -> Density density |> Ok
+                | _, Some "on" -> On |> Ok
+                | _, Some "off" -> Off |> Ok
+                | _, Some "open" -> Open |> Ok
+                | _, Some "close" -> Close |> Ok
+                // other states are not supported yet
+                | invalidState -> Error $"Invalid state: {invalidState}"
+
             return {
-                Room = parsed.Room
-                Device = parsed.Device
-                Density = parsed.Density
+                Room = ZoneId parsed.Room
+                Device = DeviceId parsed.Device
+                State = state
             }
         }
 
-    let changeDeviceState (_, output as io) config deviceState =
+    let changeDeviceState (_, output as io) config deviceState = asyncResult {
+        do! login io config
+
+        output.Section "[Eaton] Change Device State"
+        let! response =
+            [
+                deviceState.Room |> ZoneId.value
+                deviceState.Device |> DeviceId.value
+                deviceState.State |> DeviceState.value
+            ]
+            :> obj
+            |> Dto
+            |> RPC.Request.create "StatusControlFunction/controlDevice"
+            |> RPC.call config
+
+        output.Success "Done"
+
+        return ()
+    }
+
+    type TriggerScene = {
+        Room: ZoneId
+        Scene: SceneId
+    }
+
+    [<RequireQualifiedAccess>]
+    module TriggerScene =
+        open Microsoft.AspNetCore.Http
+
+        type private TriggerSceneSchema = JsonProvider<"schema/triggerSceneRequest.json", SampleIsList=true>
+
+        // todo - handle errors better
+        let parse (ctx: HttpContext) = asyncResult {
+            use reader = new StreamReader(ctx.Request.Body)
+
+            let! body =
+                reader.ReadToEndAsync()
+                |> AsyncResult.ofTaskCatch string
+
+            let! parsed =
+                try body |> TriggerSceneSchema.Parse |> Ok
+                with e -> Error e.Message
+
+            return {
+                Room = ZoneId parsed.Room
+                Scene = SceneId parsed.Scene
+            }
+        }
+
+    let triggerScene (_, output as io) config triggerScene =
         asyncResult {
             do! login io config
 
-            output.Section "[Eaton] Change Device State"
+            output.Section "[Eaton] Trigger Scene"
             let! response =
-                [ deviceState.Room; deviceState.Device; string deviceState.Density ]
+                [
+                    triggerScene.Room |> ZoneId.value
+                    triggerScene.Scene |> SceneId.value
+                ]
                 :> obj
                 |> Dto
-                |> RPC.Request.create "StatusControlFunction/controlDevice"
+                |> RPC.Request.create "SceneFunction/triggerScene"
                 |> RPC.call config
 
             output.Success "Done"

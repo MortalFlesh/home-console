@@ -21,6 +21,10 @@
         <Compile Include="Command/Types.fs" />
         <Compile Include="Config.fs" />
 
+        <Compile Include="WebServer/Utils.fs" />
+        <Compile Include="WebServer/View.fs" />
+        <Compile Include="WebServer/WebServer.fs" />
+
         <Compile Include="Command/DownloadEatonHistory.fs" />
         <Compile Include="Command/DownloadEatonDeviceList.fs" />
         <Compile Include="Command/RunWebServer.fs" />

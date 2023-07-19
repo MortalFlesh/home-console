@@ -1,6 +1,7 @@
 namespace MF.Eaton
 
 open System
+open MF.Utils
 
 [<AutoOpen>]
 module HttpTypes =
@@ -39,6 +40,33 @@ type ApiError =
 
 type DeviceId = DeviceId of string
 
+type Sensor =
+    | AnalogSensor
+
+type Actuator =
+    | ShutterActuator
+    | SwitchActuator
+    | DimmerActuator
+
+[<RequireQualifiedAccess>]
+type TermostatSubType =
+    | RoomController
+    | HumiditySensor
+    | TemperatureSensor
+    | Adjustment
+
+type Zone = {
+    Id: ZoneId
+    Name: string
+    Devices: DeviceInZone list
+}
+
+and ZoneId = ZoneId of string
+and DeviceInZone = {
+    DeviceId: DeviceId
+    Name: string
+}
+
 type Device = {
     Name: string
     DisplayName: string
@@ -52,6 +80,8 @@ type Device = {
     Powered: PowerStatus
 
     Children: Device list
+
+    Zone: ZoneId option
 }
 
 and [<RequireQualifiedAccess>] Rssi =
@@ -65,13 +95,10 @@ and [<RequireQualifiedAccess>] PowerStatus =
     | Other of id: int option * status: string option
 
 and DeviceType =
+    | Sensor of Sensor
+    | Actuator of Actuator
+    | Termostat of TermostatSubType
     | PushButton
-    | ShutterActuator
-    | HumiditySensor
-    | Termostat
-    | AnalogSensor
-    | SwitchActuator
-    | DimmerActuator
     | Other of string option
 
 type DeviceStat = {
@@ -91,15 +118,136 @@ type History = {
     Data: string list
 }
 
+type Scene = {
+    Id: SceneId
+    Zone: ZoneId
+    Name: string
+}
+
+and SceneId = SceneId of string
+
+[<RequireQualifiedAccess>]
+module SceneId =
+    let value (SceneId value) = value
+
+[<RequireQualifiedAccess>]
+module ZoneId =
+    let value (ZoneId value) = value
+
+[<RequireQualifiedAccess>]
+module Rssi =
+    let tryParse = function
+        | Some 1, Some status
+        | Some 2, Some status
+        | Some 3, Some status
+            -> Rssi.Enabled status |> Some
+        | Some 0, _ -> Rssi.Disabled |> Some
+        | _ -> None
+
+    let parse rssi =
+        rssi
+        |> tryParse
+        |> Option.defaultValue (Rssi.Other rssi)
+
+[<RequireQualifiedAccess>]
+module Powered =
+    let tryParse = function
+        | Some 6, String.OptionContains "Sítově Napájené" -> PowerStatus.Always |> Some
+        | Some 1, Some status -> PowerStatus.Battery status |> Some
+        | _ -> None
+
+    let parse powered =
+        powered
+        |> tryParse
+        |> Option.defaultValue (PowerStatus.Other powered)
+
+[<RequireQualifiedAccess>]
+module Name =
+    let asUniqueKey name =
+        name
+        |> String.remove [ "["; "]"; "("; ")" ]
+        |> String.replaceAll ["ě"; "é"] "e"
+        |> String.replace "š" "s"
+        |> String.replace "č" "c"
+        |> String.replace "ř" "r"
+        |> String.replace "ž" "z"
+        |> String.replace "ý" "y"
+        |> String.replace "á" "a"
+        |> String.replace "í" "i"
+        |> String.replace " " "_"
+        |> String.lower
+        |> sprintf "eaton_%s"
+
 [<RequireQualifiedAccess>]
 module DeviceId =
     let contains (part: string) (DeviceId device) =
         device.Contains part
 
+    let value (DeviceId device) = device
+
     let id (DeviceId device) =
         device
-            .Replace(" ", "_")
-            .Replace(":", "_")
+        |> String.replaceAll [ " "; ":" ] "_"
+
+    let shortId = value >> String.split ":" >> List.last >> sprintf "xCo:%s"
+
+[<RequireQualifiedAccess>]
+module DeviceType =
+    let valueType = function
+        | Termostat TermostatSubType.Adjustment
+        | Termostat TermostatSubType.TemperatureSensor -> "temperature"
+        | Termostat TermostatSubType.HumiditySensor -> "humidity"
+        | _ -> "value"
+
+    let unitOfMeassure = function
+        | Termostat TermostatSubType.TemperatureSensor
+        | Termostat TermostatSubType.Adjustment -> Some "°C"
+
+        | Termostat TermostatSubType.HumiditySensor -> Some "%"
+
+        | _ -> None
+
+    let parseMainType = function
+        | String.OptionContains "Room Controller" ->
+            Termostat TermostatSubType.RoomController
+
+        | Some (String.Contains "Actuator" as deviceType) ->
+            match deviceType with
+            | String.Contains "Dimmer" -> Actuator DimmerActuator
+            | String.Contains "Shutter" -> Actuator ShutterActuator
+            | String.Contains "Switch" -> Actuator SwitchActuator
+            | other -> Other (Some other)
+
+        | Some (String.Contains "Sensor" as deviceType) ->
+            match deviceType with
+            | String.Contains "Analog" -> Sensor AnalogSensor
+            | other -> Other (Some other)
+
+        | Some (String.Contains "Push-Button") -> PushButton
+
+        | other -> Other other
+
+    let parseChildType (DeviceId deviceId) = function
+        | Termostat TermostatSubType.RoomController, _ ->
+            match deviceId with
+            | String.EndsWith "u0" -> Termostat TermostatSubType.TemperatureSensor
+            | String.EndsWith "u1" -> Termostat TermostatSubType.HumiditySensor
+            | String.EndsWith "w" -> Termostat TermostatSubType.Adjustment
+            | _ -> Termostat TermostatSubType.Adjustment
+
+        | parentType, _ -> parentType
+
+[<RequireQualifiedAccess>]
+module Device =
+    let isSensor = function
+        | { Type = Termostat _ }
+        | { Type = Sensor _ } -> true
+        | _ -> false
+
+    let isSwitch = function
+        | { Type = Actuator _ }
+        | { Type = PushButton }  -> true
+        | _ -> false
 
 [<RequireQualifiedAccess>]
 module DeviceStat =

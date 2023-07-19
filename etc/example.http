@@ -2,9 +2,37 @@
 
 GET http://127.0.0.1:28080/sensors
 
-### Change device state
+### Change device state - light to 50%
 
 POST http://127.0.0.1:28080/state
 Content-Type: application/json
 
 {"room": "hz_3", "device": "xCo:4116923_u0", "density": 50}
+
+### Change device state - to ON
+
+POST http://127.0.0.1:28080/state
+Content-Type: application/json
+
+{"room": "hz_3", "device": "xCo:4116923_u0", "state": "on"}
+
+### Change device state - to OFF
+
+POST http://127.0.0.1:28080/state
+Content-Type: application/json
+
+{"room": "hz_3", "device": "xCo:4116923_u0", "state": "off"}
+
+### Open kitchen window
+
+POST http://127.0.0.1:28080/state
+Content-Type: application/json
+
+{"room": "hz_1", "device": "xCo:4291880_u0", "density": 60}
+
+### Trigger scene
+
+POST http://127.0.0.1:28080/triggerScene
+Content-Type: application/json
+
+{"room": "hz_1", "scene": "MA7"}

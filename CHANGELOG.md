@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Show real sensors and switches on homepage
+- Allow to trigger scene
 
 ## 1.10.0 - 2023-07-18
 - Use net7.0

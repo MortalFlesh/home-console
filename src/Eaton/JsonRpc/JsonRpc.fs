@@ -233,6 +233,16 @@ module Response =
         | :? 'Result as result -> f result
         | _ -> None
 
+    let tryParseResultAsJsonList response =
+        response
+        |> tryParseResult<RawJsonData, string list> (fun (RawJsonData json) ->
+            json.AsArray()
+            |> Array.toList
+            |> List.map (fun item -> item.ToString())
+            |> Some
+        )
+        |> Option.defaultValue []
+
     let tryParseResultAsJsonString response =
         response
         |> tryParseResult<RawJsonData, string> (fun (RawJsonData json) -> Some <| json.ToString())
