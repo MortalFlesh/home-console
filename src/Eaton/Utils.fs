@@ -9,11 +9,6 @@ module internal Utils =
         | true, value -> Some value
         | _ -> None
 
-    [<Obsolete("use String.")>]
-    let (|Contains|_|): string -> string option -> _ = fun part -> function
-        | Some s when s.Contains part -> Some Contains
-        | _ -> None
-
     [<RequireQualifiedAccess>]
     module String =
         let (|EndsWith|_|): string -> string -> _ = fun part -> function

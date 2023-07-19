@@ -680,7 +680,8 @@ module Api =
     and DeviceState =
         | Density of int
         | On | Off
-        | Open | Close | Stop
+        | Toggle
+        | Open | Close | Stop | StepOpen | StepClose    // ShutterActuator
 
     [<RequireQualifiedAccess>]
     module DeviceState =
@@ -689,10 +690,58 @@ module Api =
 
             | On -> "on"
             | Off -> "off"
+            | Toggle -> "toggle"
 
             | Open -> "open"
             | Close -> "close"
             | Stop -> "stop"
+            | StepOpen -> "stepOpen"
+            | StepClose -> "stepClose"
+
+    type private GetDeviceStateSchema = JsonProvider<"schema/getDeviceStateResponse.json", SampleIsList=true>
+
+    let getDeviceState (_, output as io) config (zone, deviceId) = asyncResult {
+        do! login io config
+
+        output.Section "[Eaton] Get Device State"
+        let! response =
+            [
+                zone |> ZoneId.value
+                ""
+            ]
+            :> obj
+            |> Dto
+            |> RPC.Request.create "StatusControlFunction/getDevices"
+            |> RPC.call config
+
+        let stateValue =
+            response
+            |> Response.tryParseResultAsJsonList
+            |> List.tryPick (fun state ->
+                try
+                    let parsed = state |> GetDeviceStateSchema.Parse
+
+                    if parsed.Id = (deviceId |> DeviceId.shortId) then Some parsed.Value
+                    else None
+                with e -> None
+            )
+
+        if output.IsVeryVerbose() then
+            output.Message("<c:gray>[Debug]</c> Response for %A in %A stateValue: <c:magenta>%A</c>", deviceId |> DeviceId.shortId, zone |> ZoneId.value, stateValue)
+
+        let isOn =
+            match stateValue with
+            | Some state ->
+                match state.Number, state.String with
+                | Some number, _ -> number > (decimal 0)
+                | _, Some string -> string = "ON"
+                | _ -> false
+            | _ -> false
+
+        output.Success "Done"
+
+        return isOn
+    }
 
     [<RequireQualifiedAccess>]
     module ChangeDeviceState =
@@ -719,6 +768,7 @@ module Api =
                 | _, Some "off" -> Off |> Ok
                 | _, Some "open" -> Open |> Ok
                 | _, Some "close" -> Close |> Ok
+                // other states are not supported yet
                 | invalidState -> Error $"Invalid state: {invalidState}"
 
             return {
@@ -728,26 +778,25 @@ module Api =
             }
         }
 
-    let changeDeviceState (_, output as io) config deviceState =
-        asyncResult {
-            do! login io config
+    let changeDeviceState (_, output as io) config deviceState = asyncResult {
+        do! login io config
 
-            output.Section "[Eaton] Change Device State"
-            let! response =
-                [
-                    deviceState.Room |> ZoneId.value
-                    deviceState.Device |> DeviceId.value
-                    deviceState.State |> DeviceState.value
-                ]
-                :> obj
-                |> Dto
-                |> RPC.Request.create "StatusControlFunction/controlDevice"
-                |> RPC.call config
+        output.Section "[Eaton] Change Device State"
+        let! response =
+            [
+                deviceState.Room |> ZoneId.value
+                deviceState.Device |> DeviceId.value
+                deviceState.State |> DeviceState.value
+            ]
+            :> obj
+            |> Dto
+            |> RPC.Request.create "StatusControlFunction/controlDevice"
+            |> RPC.call config
 
-            output.Success "Done"
+        output.Success "Done"
 
-            return ()
-        }
+        return ()
+    }
 
     type TriggerScene = {
         Room: ZoneId

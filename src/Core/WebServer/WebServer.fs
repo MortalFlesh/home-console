@@ -148,6 +148,14 @@ module WebServer =
         |}
     }
 
+    let private getDeviceState (zone, device): Action<_> = fun (input, output) config ctx -> asyncResult {
+        let! state =
+            (ZoneId zone, DeviceId device)
+            |> Api.getDeviceState (input, output) config.Eaton
+
+        return {| State = state |}
+    }
+
     let private changeDeviceState: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -205,6 +213,9 @@ module WebServer =
 
                 route "/sensors"
                     >=> handleJsonAction sensorsStats
+
+                routef "/state/%s/%s"
+                    (getDeviceState >> handleJsonAction)
             ]
 
             POST >=> choose [

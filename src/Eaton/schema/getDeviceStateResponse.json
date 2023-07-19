@@ -1,0 +1,223 @@
+[
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Kuchyň] Vrchní Skříňky",
+        "id": "xCo:4110125_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Podhled (Střed)",
+        "id": "xCo:4116920_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Před ložnicí",
+        "id": "xCo:4119299_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Podhled (Kraj)",
+        "id": "xCo:4129662_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Jídelna",
+        "id": "xCo:4139062_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Kuchyň] Světlo",
+        "id": "xCo:4139113_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Vstup",
+        "id": "xCo:4203215_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Obývák] Nad TV",
+        "id": "xCo:4275181_u0",
+        "type": "DimActuator",
+        "value": "0"
+    },
+    {
+        "unit": "",
+        "operations": [
+            "off",
+            "on",
+            "toggle",
+            "directSetLock",
+            "directReleaseLock",
+            "directSwitchOn",
+            "directSwitchOff"
+        ],
+        "name": "[Kuchyň] Spodní Skříňky",
+        "id": "xCo:6026236_u0",
+        "type": "LightActuator",
+        "value": "OFF"
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Obývák] Žaluzie (L)",
+        "id": "xCo:2883518_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Balkón] Markíza",
+        "id": "xCo:2883588_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Obývák] Žaluzie (P)",
+        "id": "xCo:3150247_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Obývák] Střešní okna",
+        "id": "xCo:4112592_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Kuchyň](ok) Ven. Žaluzie",
+        "id": "xCo:4291880_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Obývák](ok) Ven. Žaluzie",
+        "id": "xCo:8417035_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "",
+        "operations": [
+            "open",
+            "close",
+            "stop",
+            "stepOpen",
+            "stepClose"
+        ],
+        "name": "[Obývák](dv) Ven. Žaluzie",
+        "id": "xCo:8417194_u0",
+        "type": "ShutterActuator",
+        "value": ""
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "history"
+        ],
+        "name": "[Obývák] Vlhkoměr",
+        "id": "xCo:4131920_u1",
+        "type": "HumiditySensor",
+        "value": "35"
+    },
+    {
+        "unit": "°C",
+        "operations": [
+            "history"
+        ],
+        "name": "[Obývák] Termostat (temperature)",
+        "id": "xCo:4131920_u0",
+        "type": "TemperatureSensor",
+        "value": "27.3"
+    },
+    {
+        "unit": "°C",
+        "name": "[Obývák] Termostat (adjustment)",
+        "id": "xCo:4131920_w",
+        "type": "WheelSensor",
+        "value": "-0.9"
+    }
+]

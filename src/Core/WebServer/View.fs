@@ -150,8 +150,10 @@ module View =
                                         "  - platform: rest"
                                         $"    name: Eaton - {switch.Name}"
                                         $"    resource: http://{currentHost}/state"
-                                        sprintf "    body_on: '{\"room\": \"%s\", \"device\": \"xCo:%s\", %s}'" room deviceId state.On
-                                        sprintf "    body_off: '{\"room\": \"%s\", \"device\": \"xCo:%s\", %s}'" room deviceId state.Off
+                                        $"    state_resource: http://{currentHost}/state/{room}/{deviceId}"
+                                        sprintf "    body_on: '{\"room\": \"%s\", \"device\": \"%s\", %s}'" room deviceId state.On
+                                        sprintf "    body_off: '{\"room\": \"%s\", \"device\": \"%s\", %s}'" room deviceId state.Off
+                                        "    is_on_template: '{{ value_json.state }}'"
                                         "    headers:"
                                         "      Content-Type: application/json"
                                     ]

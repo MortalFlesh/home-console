@@ -189,7 +189,7 @@ module DeviceId =
         device
         |> String.replaceAll [ " "; ":" ] "_"
 
-    let shortId = value >> String.split ":" >> List.last
+    let shortId = value >> String.split ":" >> List.last >> sprintf "xCo:%s"
 
 [<RequireQualifiedAccess>]
 module DeviceType =
