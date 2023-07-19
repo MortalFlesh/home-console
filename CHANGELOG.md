@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.12.0 - 2023-07-19
 - Add cache for device states, update it internally and offers a cache in device state endpoint
 - Add /states endpoint to show a current states
 
