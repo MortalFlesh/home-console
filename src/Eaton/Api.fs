@@ -700,50 +700,91 @@ module Api =
 
     type private GetDeviceStateSchema = JsonProvider<"schema/getDeviceStateResponse.json", SampleIsList=true>
 
-    let getDeviceState (_, output as io) config (zone, deviceId) = asyncResult {
-        do! login io config
+    [<RequireQualifiedAccess>]
+    module DeviceStates =
+        open MF.Utils
+        open MF.Utils.ConcurrentCache
 
-        output.Section "[Eaton] Get Device State"
-        let! response =
-            [
-                zone |> ZoneId.value
-                ""
-            ]
-            :> obj
-            |> Dto
-            |> RPC.Request.create "StatusControlFunction/getDevices"
-            |> RPC.call config
+        let mutable lastUpdated = DateTime.Now
+        let private cache: Cache<ZoneId * DeviceId, bool> = create()
 
-        let stateValue =
-            response
-            |> Response.tryParseResultAsJsonList
-            |> List.tryPick (fun state ->
-                try
-                    let parsed = state |> GetDeviceStateSchema.Parse
+        let private getDeviceStates (_, output as io) config zone = asyncResult {
+            do! login io config
 
-                    if parsed.Id = (deviceId |> DeviceId.shortId) then Some parsed.Value
-                    else None
-                with e -> None
-            )
+            output.Section ("[Eaton] Get Devices States in the Zone <c:cyan>%s</c>", zone |> ZoneId.value)
+            let! response =
+                [
+                    zone |> ZoneId.value
+                    ""
+                ]
+                :> obj
+                |> Dto
+                |> RPC.Request.create "StatusControlFunction/getDevices"
+                |> RPC.call config
 
-        if output.IsVeryVerbose() then
-            output.Message("<c:gray>[Debug]</c> Response for %A in %A stateValue: <c:magenta>%A</c>", deviceId |> DeviceId.shortId, zone |> ZoneId.value, stateValue)
+            let stateValues =
+                response
+                |> Response.tryParseResultAsJsonList
+                |> List.map (fun state ->
+                    try
+                        let parsed = state |> GetDeviceStateSchema.Parse
 
-        let isOn =
-            match stateValue with
-            | Some state ->
-                match state.Number, state.String with
-                | Some number, _ -> number > (decimal 0)
-                | _, Some string ->
-                    let lower = string.ToLower()
-                    lower = "on" || lower = "open"
-                | _ -> false
-            | _ -> false
+                        let isOn =
+                            match parsed.Value.Number, parsed.Value.String with
+                            | Some number, _ -> number > (decimal 0)
+                            | _, Some string ->
+                                let lower = string.ToLower()
+                                lower = "on" || lower = "open"
+                            | _ -> false
 
-        output.Success "Done"
+                        Ok (DeviceId parsed.Id, isOn)
+                    with e -> Error (ApiError.Exception e)
+                )
+                |> List.choose Result.toOption
 
-        return isOn
-    }
+            if output.IsVeryVerbose() then
+                output.Message(
+                    "<c:gray>[Debug]</c> Response for %A stateValue:\n - %s",
+                    zone |> ZoneId.value,
+                    stateValues |> List.map (fun (DeviceId deviceId, isOn) -> sprintf "%A: <c:magenta>%A</c>" deviceId isOn) |> String.concat "\n - "
+                )
+
+            output.Success "Done"
+
+            return stateValues
+        }
+
+        let storeState key state =
+            cache |> Cache.set (Key key) state
+            lastUpdated <- DateTime.Now
+
+        let rec startLoadingState ((_, output) as io: IO) config zones: Async<unit> = async {
+            output.Section "[Eaton] Loading Device States ..."
+
+            do!
+                zones
+                |> List.map (fun zone -> asyncResult {
+                    let! deviceStates = zone |> getDeviceStates io config
+
+                    deviceStates
+                    |> List.iter (fun (deviceId, isOn) -> storeState (zone, deviceId) isOn)
+                })
+                |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
+                |> Async.Ignore
+
+            do! Async.Sleep (TimeSpan.FromSeconds 10)
+
+            return! zones |> startLoadingState io config
+        }
+
+        let loadState key =
+            lastUpdated, cache |> Cache.tryFind (Key key)
+
+        let all () =
+            lastUpdated,
+            cache
+            |> Cache.items
+            |> List.map (fun (Key (zone, device), isOn) -> zone, device, isOn)
 
     [<RequireQualifiedAccess>]
     module ChangeDeviceState =

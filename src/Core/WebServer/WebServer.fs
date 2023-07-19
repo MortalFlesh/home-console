@@ -149,11 +149,26 @@ module WebServer =
     }
 
     let private getDeviceState (zone, device): Action<_> = fun (input, output) config ctx -> asyncResult {
-        let! state =
+        let state =
             (ZoneId zone, DeviceId device)
-            |> Api.getDeviceState (input, output) config.Eaton
+            |> Api.DeviceStates.loadState
+            |> snd
+            |> Option.defaultValue false
 
         return {| State = state |}
+    }
+
+    let private getAllDevicesStates: Action<_> = fun (input, output) config ctx -> asyncResult {
+        let lastUpdated, states = Api.DeviceStates.all ()
+
+        return {|
+            Updated = lastUpdated
+            States =
+                states
+                |> List.groupBy (fun (zone, _, _) -> zone)
+                |> List.map (fun (ZoneId zone, states) -> zone, states |> List.map (fun (_, DeviceId device, state) -> device, state) |> Map.ofList)
+                |> Map.ofList
+        |}
     }
 
     let private changeDeviceState: Action<_> = fun (input, output) config ctx -> asyncResult {
@@ -198,33 +213,45 @@ module WebServer =
         | Error error -> return! (json error >=> setStatusCode 400) next ctx
     }
 
-    let run loggerFactory (input, output) (config: Config) port =
+    let run loggerFactory (input, output) (config: Config) port: AsyncResult<unit, ApiError> = asyncResult {
         let handleJsonAction action = handleJsonAction (input, output) config action
         let handleHtmlAction action = handleHtmlAction (input, output) config action
 
-        [
-            GET >=> choose [
-                // ingress: https://github.com/sabeechen/hassio-google-drive-backup/blob/1451592e93209c844b0e871602374a0277bf07c8/hassio-google-drive-backup/dev/apiingress.py
+        let! (zones: Zone list) = loadZones (input, output) config
 
-                // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
-                route "/"
-                    //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
-                    >=> handleHtmlAction (index port)
+        zones
+        |> List.map (fun zone -> zone.Id)
+        |> Api.DeviceStates.startLoadingState (input, output) config.Eaton
+        |> Async.Start
 
-                route "/sensors"
-                    >=> handleJsonAction sensorsStats
+        return
+            [
+                GET >=> choose [
+                    // ingress: https://github.com/sabeechen/hassio-google-drive-backup/blob/1451592e93209c844b0e871602374a0277bf07c8/hassio-google-drive-backup/dev/apiingress.py
 
-                routef "/state/%s/%s"
-                    (getDeviceState >> handleJsonAction)
+                    // https://developers.home-assistant.io/docs/api/supervisor/endpoints/#addons
+                    route "/"
+                        //>=> authorizeRequest WebServer.isHassioIngressRequest WebServer.accessDeniedJson
+                        >=> handleHtmlAction (index port)
+
+                    route "/sensors"
+                        >=> handleJsonAction sensorsStats
+
+                    routef "/state/%s/%s"
+                        (getDeviceState >> handleJsonAction)
+
+                    route "/states"
+                        >=> handleJsonAction getAllDevicesStates
+                ]
+
+                POST >=> choose [
+                    route "/state"
+                        >=> handleJsonAction changeDeviceState
+
+                    route "/triggerScene"
+                        >=> handleJsonAction triggerScene
+                ]
             ]
-
-            POST >=> choose [
-                route "/state"
-                    >=> handleJsonAction changeDeviceState
-
-                route "/triggerScene"
-                    >=> handleJsonAction triggerScene
-            ]
-        ]
-        |> app loggerFactory output port
-        |> Application.run
+            |> app loggerFactory output port
+            |> Application.run
+    }
