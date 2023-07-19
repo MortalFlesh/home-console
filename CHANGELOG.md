@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.11.1 - 2023-07-19
 - Read device state `open`
 
 ## 1.11.0 - 2023-07-19
