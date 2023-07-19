@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Read device state `open`
 
 ## 1.11.0 - 2023-07-19
 - Show real sensors and switches on homepage
