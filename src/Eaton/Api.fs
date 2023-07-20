@@ -836,6 +836,14 @@ module Api =
             |> RPC.Request.create "StatusControlFunction/controlDevice"
             |> RPC.call config
 
+        let isOn =
+            match deviceState.State with
+            | Density density -> density > 0
+            | On | Open -> true
+            | _ -> false
+
+        isOn |> DeviceStates.storeState (deviceState.Room, deviceState.Device)
+
         output.Success "Done"
 
         return ()
