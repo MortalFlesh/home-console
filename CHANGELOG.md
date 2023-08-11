@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Use build project
 
 ## 1.13.0 - 2023-07-20
 - Store current state after changing

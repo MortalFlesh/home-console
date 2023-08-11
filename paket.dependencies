@@ -3,7 +3,7 @@ framework: net7.0
 storage: none
 
 nuget FSharp.Core ~> 7.0
-nuget FSharp.Data ~> 4.0
+nuget FSharp.Data ~> 6.0
 nuget Microsoft.Extensions.Logging ~> 7.0
 nuget Microsoft.Extensions.Logging.Console ~> 7.0
 nuget NReco.Logging.File ~> 1.1
