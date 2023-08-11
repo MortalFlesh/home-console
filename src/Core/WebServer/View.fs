@@ -153,7 +153,11 @@ module View =
                                         $"    state_resource: http://{currentHost}/state/{room}/{deviceId}"
                                         sprintf "    body_on: '{\"room\": \"%s\", \"device\": \"%s\", %s}'" room deviceId state.On
                                         sprintf "    body_off: '{\"room\": \"%s\", \"device\": \"%s\", %s}'" room deviceId state.Off
-                                        "    is_on_template: '{{ value_json.state }}'"
+
+                                        match switch.Type with
+                                        | Actuator ShutterActuator -> ()
+                                        | _ -> "    is_on_template: '{{ value_json.state }}'"
+
                                         "    headers:"
                                         "      Content-Type: application/json"
                                     ]
