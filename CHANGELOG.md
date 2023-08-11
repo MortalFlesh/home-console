@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.14.0 - 2023-08-11
 - Use build project
 
 ## 1.13.0 - 2023-07-20
