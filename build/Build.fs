@@ -1,5 +1,5 @@
 // ========================================================================================================
-// === F# / Project fake build ==================================================================== 1.0.0 =
+// === F# / Project fake build ==================================================================== 1.4.0 =
 // --------------------------------------------------------------------------------------------------------
 // Options:
 //  - no-clean   - disables clean of dirs in the first step (required on CI)
@@ -21,7 +21,7 @@ let main args =
         Project = {
             Name = "Home Console"
             Summary = "Console application to help with home automations."
-            Git = Git.init()
+            Git = Git.init ()
         }
         Specs = Spec.defaultConsoleApplication [
             RaspberryPiHassioAddon
