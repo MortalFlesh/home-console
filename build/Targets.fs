@@ -12,6 +12,7 @@ module internal Targets =
     open Fake.Core.TargetOperators
 
     open Utils
+    open Github.Types
 
     // --------------------------------------------------------------------------------------------------------
     // 2. Targets for FAKE
@@ -24,45 +25,47 @@ module internal Targets =
         let init safe =
             Target.create "SafeClean" (fun _ ->
                 Shell.cleanDir safe.DeployPath
-                run dotnet "fable clean --yes" safe.ClientPath // Delete *.fs.js files created by Fable
+                run dotnet [ "fable"; "clean"; "--yes" ] safe.ClientPath // Delete *.fs.js files created by Fable
             )
 
             Target.create "InstallClient" (fun _ ->
-                run npm "--version" "."
-                run npm "install" "."
+                run npm [ "--version" ] "."
+                run npm [ "install" ] "."
             )
 
             Target.create "Bundle" (fun _ ->
                 [
-                    "server", dotnet $"publish -c Release -o \"{safe.DeployPath}\"" safe.ServerPath
-                    "client", dotnet "fable -o output -s --run npm run build" safe.ClientPath
+                    "server", dotnet [ "publish"; "-c"; "Release"; "-o"; safe.DeployPath ] safe.ServerPath
+                    "client", dotnet [ "fable"; "-o"; "output"; "-s"; "--run"; "npx"; "vite"; "build" ] safe.ClientPath
                 ]
                 |> runParallel
             )
 
             Target.create "Run" (fun _ ->
-                run dotnet "build" safe.SharedPath
+                run dotnet [ "build" ] safe.SharedPath
                 [
-                    "server", dotnet "watch run" safe.ServerPath
-                    "client", dotnet "fable watch -o output -s --run npm run start" safe.ClientPath
+                    "server", dotnet [ "watch"; "run" ] safe.ServerPath
+                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
                 ]
                 |> runParallel
             )
 
             Target.create "WatchTests" (fun _ ->
-                run dotnet "build" safe.SharedTestsPath
+                run dotnet [ "build" ] safe.SharedTestsPath
+
                 [
-                    "server", dotnet "watch run" safe.ServerTestsPath
-                    "client", dotnet "fable watch -o output -s --run npm run test:live" safe.ClientTestsPath
+                    "server", dotnet [ "watch"; "run" ] safe.ServerTestsPath
+                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
 
             Target.create "Tests" (fun _ ->
-                run dotnet "build" safe.SharedTestsPath
+                run dotnet [ "build" ] safe.SharedTestsPath
+
                 [
-                    "server", dotnet "run" safe.ServerTestsPath
-                    // "client", dotnet "fable watch -o output -s --run npm run test:live" clientTestsPath
+                    "server", dotnet [ "run" ] safe.ServerTestsPath
+                    //"client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientTestsPath
                 ]
                 |> runParallel
             )
@@ -234,7 +237,7 @@ module internal Targets =
 
             Target.create "Release" (fun _ ->
                 match definition with
-                | { Specs = Library { ReleaseDir = releaseDir } } ->
+                | { Specs = Library { ReleaseDir = releaseDir; NugetApi = nugetApi } } ->
                     match "src" </> definition.Project.Name with
                     | releaseSource when releaseSource |> Directory.Exists ->
                         Dotnet.runOrFail "pack" releaseSource
@@ -291,6 +294,51 @@ module internal Targets =
                 | _ -> ()
             )
 
+            Target.create "Publish" (fun _ ->
+                match definition with
+                | { Specs = Library { NugetApi = NugetApi.NotUsed } } -> Trace.traceHeader "NugetApi is not used"
+
+                | { Specs = Library { ReleaseDir = releaseDir; NugetApi = NugetApi.Organization organization; NugetCustomServerRepository = nugetServer } } ->
+                    Trace.traceHeader "Pushing to organization nuget server"
+
+                    envVar "PRIVATE_FEED_PASS"
+                    |> Option.requireSome "Environment variable PRIVATE_FEED_PASS is not set."
+                    |> Nuget.push releaseDir (Some organization)
+
+                    match envVar "NUGET_SERVER_TOKEN", envVar "NUGET_SERVER_REPOSITORY" |> Option.orElse nugetServer with
+                    | Some token, Some repository ->
+                        Trace.tracefn "Trigger: Update %s readme" repository
+
+                        Github.triggerAction {
+                            EventType = "update-readme"
+                            CurrentProject = definition.Project.Name
+                            Token = token
+                            Organization = envVar "NUGET_SERVER_ORGANIZATION" |> Option.defaultValue organization
+                            Repository = repository
+                        }
+                        |> Async.RunSynchronously
+
+                    | _ -> ()
+
+                | { Specs = Library { ReleaseDir = releaseDir; NugetApi = NugetApi.AskForKey; Organization = organization }} ->
+                    Trace.traceHeader "Pushing to public nuget server"
+
+                    match UserInput.getUserInput "Are you sure - is it tagged yet? [y|n]: " with
+                    | "y" | "yes" ->
+                        match UserInput.getUserPassword "Nuget ApiKey: " with
+                        | null | "" -> failwithf "You have to provide an api key for nuget."
+                        | apiKey -> Nuget.push releaseDir organization apiKey
+                    | _ -> ()
+
+                | { Specs = Library { ReleaseDir = releaseDir; NugetApi = NugetApi.KeyInEnvironment name; Organization = organization }} ->
+                    Trace.traceHeader "Pushing to nuget server"
+
+                    envVar name
+                    |> Option.iter (Nuget.push releaseDir organization)
+
+                | _ -> ()
+            )
+
             Target.create "Watch" (fun _ ->
                 Dotnet.runInRootOrFail "watch run"
             )
@@ -312,6 +360,7 @@ module internal Targets =
                     ==> "Lint"
                     ==> "Tests"
                     ==> "Release"
+                    ==> "Publish"
             ]
 
         | { Specs = ConsoleApplication _ } ->

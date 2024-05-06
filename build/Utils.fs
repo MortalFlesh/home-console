@@ -71,6 +71,10 @@ module internal Utils =
             | Some v -> Some v
             | None -> f None
 
+        let requireSome error = function
+            | Some v -> v
+            | None -> failwith error
+
     [<RequireQualifiedAccess>]
     module Dotnet =
         let dotnet = createProcess "dotnet"
@@ -80,9 +84,32 @@ module internal Utils =
         let runOrFail command dir = run command dir |> orFail
         let runInRootOrFail command = run command "." |> orFail
 
+    [<RequireQualifiedAccess>]
+    module Nuget =
+        let push releaseDir organization token =
+            let sourceName =
+                organization
+                |> Option.map (fun organization ->
+                    let sourceName = "github"
+
+                    Trace.tracefn "[Nuget] Add organization %A as a source" organization
+                    sprintf "nuget add source --username %s --password %s --store-password-in-clear-text --name %s \"https://nuget.pkg.github.com/%s/index.json\""
+                        organization token sourceName organization
+                    |> Dotnet.runInRootOrFail
+
+                    sourceName
+                )
+
+            Trace.tracefn "[Nuget] Push packages"
+            sprintf "nuget push %s --source=%s --api-key=%s --skip-duplicate"
+                (releaseDir </> "*.nupkg")
+                (sourceName |> Option.defaultValue "https://api.nuget.org/v3/index.json")
+                token
+            |> Dotnet.runInRootOrFail
+
     [<AutoOpen>]
     module ProjectDefinition =
-        type ProjectSources =
+        type IProjectSources =
             abstract member Sources: IGlobbingPattern
             abstract member Tests: IGlobbingPattern
             abstract member All: IGlobbingPattern
@@ -96,10 +123,10 @@ module internal Utils =
             with
                 member this.Sources =
                     match this with
-                    | { Specs = Library app } -> app :> ProjectSources
-                    | { Specs = Executable app } -> app  :> ProjectSources
-                    | { Specs = ConsoleApplication app } -> app :> ProjectSources
-                    | { Specs = SAFEStackApplication app } -> app  :> ProjectSources
+                    | { Specs = Library app } -> app :> IProjectSources
+                    | { Specs = Executable app } -> app  :> IProjectSources
+                    | { Specs = ConsoleApplication app } -> app :> IProjectSources
+                    | { Specs = SAFEStackApplication app } -> app  :> IProjectSources
 
                 member this.ChangeLog =
                     match this with
@@ -146,12 +173,24 @@ module internal Utils =
                 LibrarySources: IGlobbingPattern
                 TestsSources: IGlobbingPattern
                 AllSources: IGlobbingPattern
+                /// Organization (it is used for a custom github nuget source)
+                Organization: string option
+                /// Configuration for nuget api, to push packages into
+                NugetApi: NugetApi
+                /// Repository for custom nuget server, it will be triggered for a readme update
+                NugetCustomServerRepository: string option
             }
 
-            interface ProjectSources with
+            interface IProjectSources with
                 member this.Sources = this.LibrarySources
                 member this.Tests = this.TestsSources
                 member this.All = this.AllSources
+
+        and [<RequireQualifiedAccess>] NugetApi =
+            | NotUsed
+            | AskForKey
+            | Organization of name: string
+            | KeyInEnvironment of string
 
         and ExecutableSpec =
             {
@@ -162,7 +201,7 @@ module internal Utils =
                 AllSources: IGlobbingPattern
             }
 
-            interface ProjectSources with
+            interface IProjectSources with
                 member this.Sources = this.ApplicationSources
                 member this.Tests = this.TestsSources
                 member this.All = this.AllSources
@@ -178,7 +217,7 @@ module internal Utils =
                 AllSources: IGlobbingPattern
             }
 
-            interface ProjectSources with
+            interface IProjectSources with
                 member this.Sources = this.ApplicationSources
                 member this.Tests = this.TestsSources
                 member this.All = this.AllSources
@@ -203,7 +242,7 @@ module internal Utils =
                 AllSources: IGlobbingPattern
             }
 
-            interface ProjectSources with
+            interface IProjectSources with
                 member this.Sources = this.ReleaseSources
                 member this.Tests = this.TestsSources
                 member this.All = this.AllSources
@@ -243,6 +282,9 @@ module internal Utils =
                         sources
                         ++ "tests/*.fsproj"
                         ++ "build/*.fsproj"
+                    Organization = None
+                    NugetApi = NugetApi.NotUsed
+                    NugetCustomServerRepository = None
                 }
 
             let defaultExecutable: ProjectSpec =
@@ -304,6 +346,22 @@ module internal Utils =
                     AllSources = release ++ "tests/**/*.fsproj"
                 }
 
+            let mapLibrary f = function
+                | Library spec -> f spec |> Library
+                | spec -> spec
+
+            let mapExecutable f = function
+                | Executable spec -> f spec |> Executable
+                | spec -> spec
+
+            let mapConsoleApplication f = function
+                | ConsoleApplication spec -> f spec |> ConsoleApplication
+                | spec -> spec
+
+            let mapSAFEStackApplication f = function
+                | SAFEStackApplication spec -> f spec |> SAFEStackApplication
+                | spec -> spec
+
         [<RequireQualifiedAccess>]
         module RuntimeId =
             /// Runtime IDs: https://docs.microsoft.com/en-us/dotnet/core/rid-catalog#macos-rids
@@ -315,3 +373,58 @@ module internal Utils =
                 | AlpineLinux -> "linux-musl-x64"
                 | RaspberryPiHassioAddon -> "alpine.3.16-arm64"
                 | Other other -> other
+
+    [<RequireQualifiedAccess>]
+    module Http =
+        open System.Net.Http
+        open System.Net.Http.Headers
+
+        let post (currentProject: string) token (url: string) (data: string) = async {
+            use client = new HttpClient()
+
+            let requestHeaders = client.DefaultRequestHeaders
+            requestHeaders.Authorization <- new AuthenticationHeaderValue("Bearer", token)
+            requestHeaders.Add("User-Agent", sprintf "Fake.Build/%s" currentProject)
+
+            use request = new StringContent(data, Text.Encoding.UTF8)
+            request.Headers.ContentType <- new MediaTypeHeaderValue("application/json")
+
+            let! response = client.PostAsync(url, request) |> Async.AwaitTask
+            response.EnsureSuccessStatusCode() |> ignore
+
+            let headers =
+                response.Headers :> seq<Collections.Generic.KeyValuePair<string, seq<string>>>
+                |> Seq.append (
+                    response.Content.Headers :> seq<Collections.Generic.KeyValuePair<string, seq<string>>>
+                )
+                |> Seq.map (fun kv -> kv.Key, kv.Value |> Seq.toList)
+                |> Map.ofSeq
+
+            use! stream = response.Content.ReadAsStreamAsync() |> Async.AwaitTask
+            use reader = new StreamReader(stream)
+
+            return headers, reader.ReadToEnd()
+        }
+
+    [<RequireQualifiedAccess>]
+    module Github =
+        [<AutoOpen>]
+        module Types =
+            type TriggerAction = {
+                CurrentProject: string
+                Token: string
+                Organization: string
+                Repository: string
+                EventType: string
+            }
+
+        let triggerAction { CurrentProject = current; Token = token; Organization = org; Repository = repo; EventType = event } = async {
+            let url =
+                $"https://api.github.com/repos/{org}/{repo}/dispatches"
+                |> tee (Trace.tracefn "Github.Trigger<%s>: %s" event)
+
+            let data = sprintf @"{""event_type"":""%s"",""client_payload"":{""from"": ""%s""}}" event current
+            let! _ = Http.post current token url data
+
+            return ()
+        }
