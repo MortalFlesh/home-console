@@ -187,12 +187,25 @@ module WebServer =
     let private triggerScene: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
-            |> Api.TriggerScene.parse
+            |> Api.TriggerSceneOrMacro.parse
             |> AsyncResult.mapError ApiError.Message
 
         do!
             request
             |> Api.triggerScene (input, output) config.Eaton
+
+        return {| Status = "Ok" |}
+    }
+
+    let private triggerMacro: Action<_> = fun (input, output) config ctx -> asyncResult {
+        let! request =
+            ctx
+            |> Api.TriggerSceneOrMacro.parse
+            |> AsyncResult.mapError ApiError.Message
+
+        do!
+            request
+            |> Api.triggerMacro (input, output) config.Eaton
 
         return {| Status = "Ok" |}
     }
@@ -250,6 +263,9 @@ module WebServer =
 
                     route "/triggerScene"
                         >=> handleJsonAction triggerScene
+
+                    route "/triggerMacro"
+                        >=> handleJsonAction triggerMacro
                 ]
             ]
             |> app loggerFactory output port

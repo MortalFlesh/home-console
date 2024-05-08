@@ -3,4 +3,4 @@
 set -e
 
 cd dist
-tar cvzf alpine.3.16-arm64.tar.gz alpine.3.16-arm64
+tar cvzf linux-musl-arm64.tar.gz linux-musl-arm64
