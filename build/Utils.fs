@@ -371,7 +371,7 @@ module internal Utils =
                 | Linux -> "linux-x64"
                 | ArmLinux -> "linux-arm64"
                 | AlpineLinux -> "linux-musl-x64"
-                | RaspberryPiHassioAddon -> "alpine.3.19-arm64"
+                | RaspberryPiHassioAddon -> "linux-musl-arm64"
                 | Other other -> other
 
     [<RequireQualifiedAccess>]
