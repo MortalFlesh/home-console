@@ -849,16 +849,16 @@ module Api =
         return ()
     }
 
-    type TriggerScene = {
+    type TriggerSceneOrMacro = {
         Room: ZoneId
         Scene: SceneId
     }
 
     [<RequireQualifiedAccess>]
-    module TriggerScene =
+    module TriggerSceneOrMacro =
         open Microsoft.AspNetCore.Http
 
-        type private TriggerSceneSchema = JsonProvider<"schema/triggerSceneRequest.json", SampleIsList=true>
+        type private TriggerSceneOrMacroSchema = JsonProvider<"schema/triggerSceneOrMacroRequest.json", SampleIsList=true>
 
         // todo - handle errors better
         let parse (ctx: HttpContext) = asyncResult {
@@ -869,7 +869,7 @@ module Api =
                 |> AsyncResult.ofTaskCatch string
 
             let! parsed =
-                try body |> TriggerSceneSchema.Parse |> Ok
+                try body |> TriggerSceneOrMacroSchema.Parse |> Ok
                 with e -> Error e.Message
 
             return {
@@ -891,6 +891,26 @@ module Api =
                 :> obj
                 |> Dto
                 |> RPC.Request.create "SceneFunction/triggerScene"
+                |> RPC.call config
+
+            output.Success "Done"
+
+            return ()
+        }
+
+    let triggerMacro (_, output as io) config triggerMacro =
+        asyncResult {
+            do! login io config
+
+            output.Section "[Eaton] Trigger Macro"
+            let! response =
+                [
+                    triggerMacro.Room |> ZoneId.value
+                    triggerMacro.Scene |> SceneId.value
+                ]
+                :> obj
+                |> Dto
+                |> RPC.Request.create "MacroFunction/triggerMacro"
                 |> RPC.call config
 
             output.Success "Done"
