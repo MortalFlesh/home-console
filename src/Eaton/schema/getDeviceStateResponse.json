@@ -219,5 +219,25 @@
         "id": "xCo:4131920_w",
         "type": "WheelSensor",
         "value": "-0.9"
+    },
+    {
+        "unit": "%",
+        "operations": [
+            "value"
+        ],
+        "name": "[Vrch] Podlaha",
+        "id": "xCo:9214125_u0",
+        "type": "AnalogInput",
+        "value": "48",
+        "status": {
+            "temperatureUnit": "°C",
+            "powerDisplay": true,
+            "temperature": 26,
+            "powerUnit": "W",
+            "power": 271.7,
+            "locked": false,
+            "overload": false
+        },
+        "info": "271.7 W"
     }
 ]

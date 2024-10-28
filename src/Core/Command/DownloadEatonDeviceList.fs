@@ -12,6 +12,7 @@ module DownloadEatonDeviceList =
     let arguments = []
     let options = [
         Console.Option.config
+        // Option.optionalArray "zone" (Some "z") "A specific zone to look for devices." None
     ]
 
     let execute = executeAsyncResult <| fun (input, output) ->
@@ -24,9 +25,22 @@ module DownloadEatonDeviceList =
                 |> Config.parse
                 |> Result.ofOption (CommandError.Message "invalid config")
 
-            let! zones =
+            let! (zones: Zone list) =
                 Api.getZoneList (input, output) config.Eaton
                 |> AsyncResult.mapError CommandError.ofEatonApiError
+
+            // todo - allow to select zones, its not just by filtering the devices in the Api.getDeviceList by the zone, think about it more
+            //let zones =
+            //    match input |> Input.Option.asList "zone" with
+            //    | [] -> zones
+            //    | preferredZones ->
+            //        let preferredZones = Set preferredZones
+            //        zones
+            //        |> List.filter (fun zone -> Set [ zone.Name; zone.Id |> ZoneId.value ] |> Set.intersect preferredZones |> Set.isEmpty |> not)
+
+            // zones
+            // |> List.map (fun zone -> [ zone.Name; zone.Id |> ZoneId.value ])
+            // |> output.Options "Selected zones"
 
             let! devices =
                 zones

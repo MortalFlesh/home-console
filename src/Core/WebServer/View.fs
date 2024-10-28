@@ -86,18 +86,41 @@ module View =
                                     let name = sensor.Name |> Name.asUniqueKey // todo - use display name in the future?
                                     let deviceId = sensor.DeviceId |> DeviceId.id
 
-                                    let valueType = sensor.Type |> DeviceType.valueType
-                                    let unitOfMeassurement = sensor.Type |> DeviceType.unitOfMeassure |> Option.defaultValue "... add manually ..."
+                                    match sensor.Type with
+                                    | Actuator HeatingActuator ->
+                                        [
+                                            {| Metric = "temperature"; Unit = "°C"; DeviceClass = "temperature" |}
+                                            {| Metric = "power_percentage"; Unit = "%"; DeviceClass = "value" |}
+                                            {| Metric = "power"; Unit = "W"; DeviceClass = "value" |}
+                                            {| Metric = "overload"; Unit = ""; DeviceClass = "value" |}
+                                        ]
+                                        |> List.collect (fun heating ->
+                                            let metric = heating.Metric
 
-                                    [
-                                        $"      {name}:"
-                                        $"        unique_id: {name}"
-                                        $"        friendly_name: \"{sensor.Name}\""
-                                        $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{valueType}'] | float }}\""
-                                        $"        unit_of_measurement: \"{unitOfMeassurement}\""
-                                        $"        device_class: {valueType}"
-                                        "        entity_id: sensor.eaton"
-                                    ]
+                                            [
+                                                $"      {name}_{metric}:"
+                                                $"        unique_id: {name}_{metric}"
+                                                $"        friendly_name: \"{sensor.Name} ({metric})\""
+                                                $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{metric}'] | float }}\""
+                                                $"        unit_of_measurement: \"{heating.Unit}\""
+                                                $"        device_class: {heating.DeviceClass}"
+                                                "        entity_id: sensor.eaton"
+                                            ]
+                                        )
+
+                                    | _ ->
+                                        let valueType = sensor.Type |> DeviceType.valueType
+                                        let unitOfMeasurement = sensor.Type |> DeviceType.unitOfMeasure |> Option.defaultValue "... add manually ..."
+
+                                        [
+                                            $"      {name}:"
+                                            $"        unique_id: {name}"
+                                            $"        friendly_name: \"{sensor.Name}\""
+                                            $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{valueType}'] | float }}\""
+                                            $"        unit_of_measurement: \"{unitOfMeasurement}\""
+                                            $"        device_class: {valueType}"
+                                            "        entity_id: sensor.eaton"
+                                        ]
                                 )
                             )
                     ]
@@ -137,7 +160,7 @@ module View =
                             |> List.collect (fun switch ->
                                 switch.Children
                                 |> List.collect (fun switch ->
-                                    let deviceId = switch.DeviceId |> DeviceId.shortId
+                                    let deviceId = switch.DeviceId |> DeviceId.shortId |> ShortDeviceId.value
                                     let room = switch.Zone |> Option.map ZoneId.value |> Option.defaultValue "unknown"
 
                                     let state =
