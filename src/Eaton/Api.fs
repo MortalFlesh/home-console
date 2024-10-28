@@ -177,7 +177,7 @@ module Api =
 
     let inline private (/) a b = Path.Combine(a, b)
 
-    let private retryOnUnathorized ((_, output): IO) (config: EatonConfig) action =
+    let private retryOnUnauthorized ((_, output): IO) (config: EatonConfig) action =
         action
         |> AsyncResult.bindError (function
             | (ApiError.Exception Http.Unauthorized) ->
@@ -283,7 +283,7 @@ module Api =
             output.Success "Done"
 
             output.Section "[Eaton] Move history file to its directory ..."
-            let now = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss")
+            let now = DateTimeOffset.Now.ToString("yyyy-MM-dd-HH-mm-ss")
             let historyFilePath = targetDir / $"history_{now}.xml"
             File.Move (tmpHistoryFilePath, historyFilePath)
             output.Success "Done"
@@ -292,7 +292,7 @@ module Api =
 
             return tmpHistoryFilePath
         }
-        |> retryOnUnathorized io config
+        |> retryOnUnauthorized io config
 
     type private DeviceItemSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesResponse.json", SampleIsList = true>
     type private DevicesStatusSchema = JsonProvider<"schema/diagnosticsPhysicalDevicesWithLogStatsResponse.json">
@@ -380,7 +380,7 @@ module Api =
 
             return zones
         }
-        |> retryOnUnathorized io config
+        |> retryOnUnauthorized io config
 
     let getDeviceList ((_, output) as io: IO) (config: EatonConfig) (zones: Zone list): AsyncResult<Device list, ApiError> =
         asyncResult {
@@ -534,7 +534,7 @@ module Api =
 
             return devices
         }
-        |> retryOnUnathorized io config
+        |> retryOnUnauthorized io config
 
     let getDeviceStatuses ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Map<DeviceId, DeviceStat>, ApiError> =
         asyncResult {
@@ -604,7 +604,7 @@ module Api =
 
             return deviceStats |> Map.ofList
         }
-        |> retryOnUnathorized io config
+        |> retryOnUnauthorized io config
 
     let getSceneList ((_, output) as io: IO) (config: EatonConfig) (zones: Zone list): AsyncResult<Scene list, ApiError> =
         asyncResult {
@@ -669,7 +669,7 @@ module Api =
 
             return scenes
         }
-        |> retryOnUnathorized io config
+        |> retryOnUnauthorized io config
 
     type ChangeDeviceState = {
         Room: ZoneId
@@ -705,8 +705,27 @@ module Api =
         open MF.Utils
         open MF.Utils.ConcurrentCache
 
-        let mutable lastUpdated = DateTime.Now
-        let private cache: Cache<ZoneId * DeviceId, bool> = create()
+        type HeatingStats =
+            {
+                Power: float
+                CurrentTemperature: float
+                PowerPercentage: int
+                Overload: bool
+            }
+
+            with
+                override this.ToString() =
+                    sprintf "%.1f °C | %d %% (%.1f W)%s" this.CurrentTemperature this.PowerPercentage this.Power (if this.Overload then " - overload!" else "")
+
+        let mutable lastUpdated = DateTimeOffset.Now
+        let private isOnCache: Cache<ZoneId * DeviceId, bool> = create()
+        let private heatingCache: Cache<ShortDeviceId, HeatingStats> = create()
+
+        type CurrentState = {
+            DeviceId: DeviceId
+            IsOn: bool
+            HeatingStats: HeatingStats option
+        }
 
         let private getDeviceStates (_, output as io) config zone = asyncResult {
             do! login io config
@@ -729,6 +748,11 @@ module Api =
                     try
                         let parsed = state |> GetDeviceStateSchema.Parse
 
+                        let decimalValue =
+                            match parsed.Value.Number, parsed.Value.String with
+                            | Some number, _ -> Some number
+                            | _ -> None
+
                         let isOn =
                             match parsed.Value.Number, parsed.Value.String with
                             | Some number, _ -> number > (decimal 0)
@@ -737,7 +761,23 @@ module Api =
                                 lower = "on" || lower = "open"
                             | _ -> false
 
-                        Ok (DeviceId parsed.Id, isOn)
+                        let heating =
+                            match parsed.Status with
+                            | Some status when status.PowerDisplay ->
+                                Some {
+                                    Power = float status.Power
+                                    CurrentTemperature = status.Temperature
+                                    PowerPercentage = decimalValue |> Option.map int |> Option.defaultValue 0
+                                    Overload = status.Overload
+                                }
+
+                            | _ -> None
+
+                        Ok {
+                            DeviceId = DeviceId parsed.Id
+                            IsOn = isOn
+                            HeatingStats = heating
+                        }
                     with e -> Error (ApiError.Exception e)
                 )
                 |> List.choose Result.toOption
@@ -746,17 +786,29 @@ module Api =
                 output.Message(
                     "<c:gray>[Debug]</c> Response for %A stateValue:\n - %s",
                     zone |> ZoneId.value,
-                    stateValues |> List.map (fun (DeviceId deviceId, isOn) -> sprintf "%A: <c:magenta>%A</c>" deviceId isOn) |> String.concat "\n - "
-                )
+                    stateValues
+                    |> List.map (function
+                        | { DeviceId = DeviceId deviceId; IsOn = isOn; HeatingStats = Some heating } ->
+                            sprintf "%A: <c:magenta>%A</c> | <c:red>Heating on %s</c>" deviceId isOn (heating.ToString())
+
+                        | { DeviceId = DeviceId deviceId; IsOn = isOn } ->
+                            sprintf "%A: <c:magenta>%A</c>" deviceId isOn
+                    )
+                    |> String.concat "\n - "
+            )
 
             output.Success "Done"
 
             return stateValues
         }
 
-        let storeState key state =
-            cache |> Cache.set (Key key) state
-            lastUpdated <- DateTime.Now
+        let storeState zone (deviceState: CurrentState) =
+            isOnCache |> Cache.set (Key (zone, deviceState.DeviceId)) deviceState.IsOn
+
+            deviceState.HeatingStats
+            |> Option.iter (fun heating -> heatingCache |> Cache.set (deviceState.DeviceId |> DeviceId.shortId |> Key) heating)
+
+            lastUpdated <- DateTimeOffset.Now
 
         let rec startLoadingState ((_, output) as io: IO) config zones: Async<unit> = async {
             output.Section "[Eaton] Loading Device States ..."
@@ -767,7 +819,7 @@ module Api =
                     let! deviceStates = zone |> getDeviceStates io config
 
                     deviceStates
-                    |> List.iter (fun (deviceId, isOn) -> storeState (zone, deviceId) isOn)
+                    |> List.iter (storeState zone)
                 })
                 |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
                 |> Async.Ignore
@@ -777,14 +829,18 @@ module Api =
             return! zones |> startLoadingState io config
         }
 
-        let loadState key =
-            lastUpdated, cache |> Cache.tryFind (Key key)
+        let loadIsOnState key =
+            lastUpdated, isOnCache |> Cache.tryFind (Key key)
 
-        let all () =
+        let allIsOnStates () =
             lastUpdated,
-            cache
+            isOnCache
             |> Cache.items
             |> List.map (fun (Key (zone, device), isOn) -> zone, device, isOn)
+
+        let loadHeatingState key =
+            printfn "[Heating] Loading state for %A" key
+            lastUpdated, heatingCache |> Cache.tryFind (Key key)
 
     [<RequireQualifiedAccess>]
     module ChangeDeviceState =
@@ -842,7 +898,11 @@ module Api =
             | On | Open -> true
             | _ -> false
 
-        isOn |> DeviceStates.storeState (deviceState.Room, deviceState.Device)
+        DeviceStates.storeState deviceState.Room {
+            DeviceId = deviceState.Device
+            IsOn = isOn
+            HeatingStats = None
+        }
 
         output.Success "Done"
 

@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Add Heating Actuator support with sensors
 
 ## 1.16.0 - 2024-05-08
 - Allow to trigger macro

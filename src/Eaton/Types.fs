@@ -47,9 +47,10 @@ type Actuator =
     | ShutterActuator
     | SwitchActuator
     | DimmerActuator
+    | HeatingActuator
 
 [<RequireQualifiedAccess>]
-type TermostatSubType =
+type ThermostatSubType =
     | RoomController
     | HumiditySensor
     | TemperatureSensor
@@ -97,7 +98,7 @@ and [<RequireQualifiedAccess>] PowerStatus =
 and DeviceType =
     | Sensor of Sensor
     | Actuator of Actuator
-    | Termostat of TermostatSubType
+    | Thermostat of ThermostatSubType
     | PushButton
     | Other of string option
 
@@ -178,6 +179,24 @@ module Name =
         |> String.lower
         |> sprintf "eaton_%s"
 
+[<AutoOpen>]
+module ShortId =
+    // there could be 2 deviceIds, so we need to normalize it (at least now)
+    // xCo:9214125_u0 –> storing device state (shortId)
+    // hdm:xComfort Adapter:9214125_u0 -> loading device state
+    type ShortDeviceId = private ShortDeviceId of string
+
+    [<RequireQualifiedAccess>]
+    module ShortDeviceId =
+        let fromDeviceId (DeviceId deviceId) =
+            deviceId
+            |> String.split ":"
+            |> List.last
+            |> sprintf "xCo:%s"
+            |> ShortDeviceId
+
+        let value (ShortDeviceId value) = value
+
 [<RequireQualifiedAccess>]
 module DeviceId =
     let contains (part: string) (DeviceId device) =
@@ -189,33 +208,36 @@ module DeviceId =
         device
         |> String.replaceAll [ " "; ":" ] "_"
 
-    let shortId = value >> String.split ":" >> List.last >> sprintf "xCo:%s"
+    let shortId = ShortDeviceId.fromDeviceId
 
 [<RequireQualifiedAccess>]
 module DeviceType =
     let valueType = function
-        | Termostat TermostatSubType.Adjustment
-        | Termostat TermostatSubType.TemperatureSensor -> "temperature"
-        | Termostat TermostatSubType.HumiditySensor -> "humidity"
+        | Actuator HeatingActuator
+        | Thermostat ThermostatSubType.Adjustment
+        | Thermostat ThermostatSubType.TemperatureSensor -> "temperature"
+        | Thermostat ThermostatSubType.HumiditySensor -> "humidity"
         | _ -> "value"
 
-    let unitOfMeassure = function
-        | Termostat TermostatSubType.TemperatureSensor
-        | Termostat TermostatSubType.Adjustment -> Some "°C"
+    let unitOfMeasure = function
+        | Actuator HeatingActuator
+        | Thermostat ThermostatSubType.TemperatureSensor
+        | Thermostat ThermostatSubType.Adjustment -> Some "°C"
 
-        | Termostat TermostatSubType.HumiditySensor -> Some "%"
+        | Thermostat ThermostatSubType.HumiditySensor -> Some "%"
 
         | _ -> None
 
     let parseMainType = function
         | String.OptionContains "Room Controller" ->
-            Termostat TermostatSubType.RoomController
+            Thermostat ThermostatSubType.RoomController
 
         | Some (String.Contains "Actuator" as deviceType) ->
             match deviceType with
             | String.Contains "Dimmer" -> Actuator DimmerActuator
             | String.Contains "Shutter" -> Actuator ShutterActuator
             | String.Contains "Switch" -> Actuator SwitchActuator
+            | String.Contains "Heating" -> Actuator HeatingActuator
             | other -> Other (Some other)
 
         | Some (String.Contains "Sensor" as deviceType) ->
@@ -225,26 +247,29 @@ module DeviceType =
 
         | Some (String.Contains "Push-Button") -> PushButton
 
+
         | other -> Other other
 
     let parseChildType (DeviceId deviceId) = function
-        | Termostat TermostatSubType.RoomController, _ ->
+        | Thermostat ThermostatSubType.RoomController, _ ->
             match deviceId with
-            | String.EndsWith "u0" -> Termostat TermostatSubType.TemperatureSensor
-            | String.EndsWith "u1" -> Termostat TermostatSubType.HumiditySensor
-            | String.EndsWith "w" -> Termostat TermostatSubType.Adjustment
-            | _ -> Termostat TermostatSubType.Adjustment
+            | String.EndsWith "u0" -> Thermostat ThermostatSubType.TemperatureSensor
+            | String.EndsWith "u1" -> Thermostat ThermostatSubType.HumiditySensor
+            | String.EndsWith "w" -> Thermostat ThermostatSubType.Adjustment
+            | _ -> Thermostat ThermostatSubType.Adjustment
 
         | parentType, _ -> parentType
 
 [<RequireQualifiedAccess>]
 module Device =
     let isSensor = function
-        | { Type = Termostat _ }
+        | { Type = Actuator HeatingActuator }
+        | { Type = Thermostat _ }
         | { Type = Sensor _ } -> true
         | _ -> false
 
     let isSwitch = function
+        | { Type = Actuator HeatingActuator } -> false
         | { Type = Actuator _ }
         | { Type = PushButton }  -> true
         | _ -> false

@@ -124,6 +124,7 @@ module WebServer =
             |> List.filter Device.isSensor
 
         let stat deviceId = devicesStats |> Map.tryFind deviceId
+        let heatingStat = DeviceId.shortId >> Api.DeviceStates.loadHeatingState
 
         return {|
             Sensors =
@@ -135,10 +136,20 @@ module WebServer =
                         Map.ofList [
                             "name", device.Name
 
+                            match heatingStat device.DeviceId with
+                            | lastUpdate, Some heating ->
+                                "heating", heating.ToString()
+
+                                "temperature", string heating.CurrentTemperature
+                                "power_percentage", string heating.PowerPercentage
+                                "power", string heating.Power
+                                "overload", heating.Overload.ToString()
+
+                                "last_update", lastUpdate.ToString("HH:mm:ss")
+                            | _ ->
                             match stat device.DeviceId with
                             | Some value ->
                                 device.Type |> DeviceType.valueType, value.EventLog |> DeviceStat.value
-
                                 "last_update", value.LastMsgTimeStamp.ToString()
                             | _ -> ()
                         ]
@@ -151,7 +162,7 @@ module WebServer =
     let private getDeviceState (zone, device): Action<_> = fun (input, output) config ctx -> asyncResult {
         let state =
             (ZoneId zone, DeviceId device)
-            |> Api.DeviceStates.loadState
+            |> Api.DeviceStates.loadIsOnState
             |> snd
             |> Option.defaultValue false
 
@@ -159,7 +170,7 @@ module WebServer =
     }
 
     let private getAllDevicesStates: Action<_> = fun (input, output) config ctx -> asyncResult {
-        let lastUpdated, states = Api.DeviceStates.all ()
+        let lastUpdated, states = Api.DeviceStates.allIsOnStates ()
 
         return {|
             Updated = lastUpdated
