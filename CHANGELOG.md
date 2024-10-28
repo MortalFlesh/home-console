@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.17.0 - 2024-10-28
 - Add Heating Actuator support with sensors
 
 ## 1.16.0 - 2024-05-08
