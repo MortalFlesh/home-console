@@ -279,5 +279,5 @@ module DeviceStat =
     let value = function
         | On -> "true"
         | Off -> "false"
-        | Decimal value -> string value
+        | Decimal value -> value |> float |> sprintf "%.1f"
         | String value -> value

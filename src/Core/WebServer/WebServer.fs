@@ -140,9 +140,9 @@ module WebServer =
                             | lastUpdate, Some heating ->
                                 "heating", heating.ToString()
 
-                                "temperature", string heating.CurrentTemperature
-                                "power_percentage", string heating.PowerPercentage
-                                "power", string heating.Power
+                                "temperature", heating.CurrentTemperature |> sprintf "%.1f"
+                                "power_percentage", heating.PowerPercentage |> float |> sprintf "%.1f"
+                                "power", heating.Power |> sprintf "%.1f"
                                 "overload", heating.Overload.ToString()
 
                                 "last_update", lastUpdate.ToString("HH:mm:ss")

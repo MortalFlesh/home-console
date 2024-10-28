@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Fix formatting float values
 
 ## 1.17.0 - 2024-10-28
 - Add Heating Actuator support with sensors
