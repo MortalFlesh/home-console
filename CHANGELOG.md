@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.17.1 - 2024-10-28
 - Fix formatting float values
 
 ## 1.17.0 - 2024-10-28
