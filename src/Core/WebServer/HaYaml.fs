@@ -119,8 +119,10 @@ module HaYaml =
         ]
 
     let lightLines currentHost (dimmers: Device list) : string list =
+        // NOTE: the /brightness endpoint keys values by the state-response id (xCo:... form),
+        // so the HA attribute keys must be derived from the short id, not the device-list id (hdm:... form)
         let dimmerId (device: Device) =
-            device.DeviceId |> DeviceId.id
+            DeviceId (device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value) |> DeviceId.id
 
         let dimmerChildren =
             dimmers
@@ -190,56 +192,81 @@ module HaYaml =
         ]
 
     let climateLines currentHost (heatings: Device list) : string list =
-        heatings
-        |> List.choose (fun device ->
-            device.Zone
-            |> Option.map (fun zone ->
-                let zoneId = zone |> ZoneId.value
-                let id = device.DeviceId |> DeviceId.id
-                let name = device.DisplayName
-                let sensorName = $"eaton_climate_{id}"
-                let restCommandName = $"eaton_climate_{id}_set_temp"
-                let climateId = $"eaton_climate_{id}"
-                [
-                    "sensor:"
-                    "  - platform: rest"
-                    $"    resource: http://{currentHost}/climate/{zoneId}"
-                    "    scan_interval: 60"
-                    $"    name: {sensorName}"
-                    $"    value_template: \"{{{{ value_json.Temperature }}}}\""
-                    "    json_attributes:"
-                    "      - Temperature"
-                    "      - Setpoint"
-                    ""
-                    "rest_command:"
-                    $"  {restCommandName}:"
-                    $"    url: \"http://{currentHost}/climate\""
-                    "    method: POST"
-                    "    headers:"
-                    "      Content-Type: application/json"
-                    sprintf "    payload: '{\"room\": \"%s\", \"temperature\": {{ temperature }}}'" zoneId
-                    ""
-                    "climate:"
-                    "  - platform: template"
-                    "    climates:"
-                    $"      {climateId}:"
-                    $"        friendly_name: \"{name}\""
-                    $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Temperature') | float(0) }}}}\""
-                    $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Setpoint') | float(0) }}}}\""
-                    "        hvac_modes:"
-                    "          - heat"
-                    "        hvac_mode_template: \"heat\""
-                    "        set_temperature:"
-                    $"          action: rest_command.{restCommandName}"
-                    "          data:"
-                    "            temperature: \"{{ temperature }}\""
-                    "        min_temp: 5"
-                    "        max_temp: 30"
-                    "        target_temp_step: 0.5"
-                ]
+        let withZone =
+            heatings
+            |> List.choose (fun device ->
+                device.Zone |> Option.map (fun zone -> device, zone |> ZoneId.value)
             )
-        )
-        |> List.collect id
+
+        match withZone with
+        | [] -> []
+        | _ ->
+            [
+                "sensor:"
+                yield!
+                    withZone
+                    |> List.collect (fun (device, zoneId) ->
+                        let id = device.DeviceId |> DeviceId.id
+                        let sensorName = $"eaton_climate_{id}"
+                        [
+                            "  - platform: rest"
+                            $"    resource: http://{currentHost}/climate/{zoneId}"
+                            "    scan_interval: 60"
+                            $"    name: {sensorName}"
+                            $"    value_template: \"{{{{ value_json.Temperature }}}}\""
+                            "    json_attributes:"
+                            "      - Temperature"
+                            "      - Setpoint"
+                        ]
+                    )
+
+                ""
+                "rest_command:"
+                yield!
+                    withZone
+                    |> List.collect (fun (device, zoneId) ->
+                        let id = device.DeviceId |> DeviceId.id
+                        let restCommandName = $"eaton_climate_{id}_set_temp"
+                        [
+                            $"  {restCommandName}:"
+                            $"    url: \"http://{currentHost}/climate\""
+                            "    method: POST"
+                            "    headers:"
+                            "      Content-Type: application/json"
+                            sprintf "    payload: '{\"room\": \"%s\", \"temperature\": {{ temperature }}}'" zoneId
+                        ]
+                    )
+
+                ""
+                "climate:"
+                "  - platform: template"
+                "    climates:"
+                yield!
+                    withZone
+                    |> List.collect (fun (device, _zoneId) ->
+                        let id = device.DeviceId |> DeviceId.id
+                        let sensorName = $"eaton_climate_{id}"
+                        let restCommandName = $"eaton_climate_{id}_set_temp"
+                        let climateId = $"eaton_climate_{id}"
+                        let name = if device.Name |> System.String.IsNullOrWhiteSpace then device.DisplayName else device.Name
+                        [
+                            $"      {climateId}:"
+                            $"        friendly_name: \"{name}\""
+                            $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Temperature') | float(0) }}}}\""
+                            $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Setpoint') | float(0) }}}}\""
+                            "        hvac_modes:"
+                            "          - heat"
+                            "        hvac_mode_template: \"heat\""
+                            "        set_temperature:"
+                            $"          action: rest_command.{restCommandName}"
+                            "          data:"
+                            "            temperature: \"{{ temperature }}\""
+                            "        min_temp: 5"
+                            "        max_temp: 30"
+                            "        target_temp_step: 0.5"
+                        ]
+                    )
+            ]
 
     let healthLines currentHost : string list =
         [
@@ -247,7 +274,7 @@ module HaYaml =
             "  - platform: rest"
             $"    resource: http://{currentHost}/health"
             "    name: eaton_bridge"
-            "    value_template: \"{{{{ value_json.Status == 'ok' }}}}\""
+            "    value_template: \"{{ value_json.Status == 'ok' }}\""
             "    device_class: connectivity"
             "    scan_interval: 60"
         ]
