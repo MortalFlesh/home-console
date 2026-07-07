@@ -2,8 +2,13 @@ namespace MF.HomeConsole
 
 open MF.Eaton
 
+type DataConfig = {
+    Directory: string
+}
+
 type Config = {
     Eaton: EatonConfig
+    Data: DataConfig
 }
 
 [<RequireQualifiedAccess>]
@@ -32,5 +37,12 @@ module Config =
                     History = {
                         DownloadDirectory = parsed.Eaton.History.Download
                     }
+                }
+                Data = {
+                    Directory =
+                        parsed.JsonValue.TryGetProperty("data")
+                        |> Option.bind (fun d -> d.TryGetProperty("directory"))
+                        |> Option.map (fun v -> v.AsString())
+                        |> Option.defaultValue ""
                 }
             }

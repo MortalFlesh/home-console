@@ -11,6 +11,22 @@
             },
             "host": "127.0.0.1",
             "devices": "devices.dist.json"
+        },
+        "data": {
+            "directory": "/data"
+        }
+    },
+    {
+        "eaton": {
+            "credentials": {
+                "username": "admin",
+                "password": "password",
+                "path": "/tmp/eaton-cookies.json"
+            },
+            "history": {
+                "download": "./eaton"
+            },
+            "host": "127.0.0.1"
         }
     }
 ]

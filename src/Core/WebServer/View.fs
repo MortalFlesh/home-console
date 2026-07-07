@@ -111,6 +111,18 @@ module View =
                 div [ _class "col-md-12" ] [
                     h3 [] [ str "Climate (floor heating)" ]
                     p [] [ str "One block per room controller. Add the sensor:, rest_command:, and climate: blocks separately." ]
+                    div [ _class "alert alert-warning" ] [
+                        strong [] [ str "Requires HACS: " ]
+                        str "the "
+                        code [] [ str "climate: - platform: template" ]
+                        str " block is not part of core Home Assistant. Install the "
+                        a [
+                            _href "https://github.com/jcwillox/hass-template-climate"
+                            _target "_blank"
+                            _rel "noopener noreferrer"
+                        ] [ str "Climate Template (hass-template-climate)" ]
+                        str " custom integration via HACS first."
+                    ]
                     HaYaml.climateLines currentHost heatings
                     |> htmlYaml
                 ]

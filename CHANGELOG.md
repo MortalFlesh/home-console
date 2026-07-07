@@ -11,6 +11,10 @@
 - Generate `binary_sensor.eaton_bridge` YAML snippet on the index page
 - Fix `last_update` in `/sensors` to emit ISO-8601 timestamps (Feature 5)
 - Generate `*_last_update` template sensors (device_class: timestamp) on the index page
+- Add `--data-path` option (Feature P0): persistent data directory defaulting to `/data` (HA add-on volume) or `./data` locally
+- Add `Store` module: atomic, thread-safe JSON load/save for all persisted state
+- Derive `--cookies-path` and `--history-path` defaults from the data directory
+- Extend `Config` with `DataConfig` carrying the resolved data directory
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values
