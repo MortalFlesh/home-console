@@ -182,6 +182,28 @@ module WebServer =
         |}
     }
 
+    let private brightnessStats: Action<_> = fun _ _ _ -> asyncResult {
+        let lastUpdated, values = Api.DeviceStates.allValueStates ()
+
+        return {|
+            Updated = lastUpdated
+            Brightness =
+                values
+                |> List.map (fun (_, device, v) -> device |> DeviceId.id, v)
+                |> Map.ofList
+        |}
+    }
+
+    let private getDeviceBrightness (zone, device): Action<_> = fun _ _ _ -> asyncResult {
+        let brightness =
+            (ZoneId zone, DeviceId device)
+            |> Api.DeviceStates.loadValueState
+            |> snd
+            |> Option.defaultValue 0
+
+        return {| Brightness = brightness |}
+    }
+
     let private changeDeviceState: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -266,6 +288,12 @@ module WebServer =
 
                     route "/states"
                         >=> handleJsonAction getAllDevicesStates
+
+                    route "/brightness"
+                        >=> handleJsonAction brightnessStats
+
+                    routef "/brightness/%s/%s"
+                        (getDeviceBrightness >> handleJsonAction)
                 ]
 
                 POST >=> choose [

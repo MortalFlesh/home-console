@@ -720,11 +720,13 @@ module Api =
         let mutable lastUpdated = DateTimeOffset.Now
         let private isOnCache: Cache<ZoneId * DeviceId, bool> = create()
         let private heatingCache: Cache<ShortDeviceId, HeatingStats> = create()
+        let private valueCache: Cache<ZoneId * DeviceId, int> = create()
 
         type CurrentState = {
             DeviceId: DeviceId
             IsOn: bool
             HeatingStats: HeatingStats option
+            Value: int option
         }
 
         let private getDeviceStates (_, output as io) config zone = asyncResult {
@@ -777,6 +779,7 @@ module Api =
                             DeviceId = DeviceId parsed.Id
                             IsOn = isOn
                             HeatingStats = heating
+                            Value = decimalValue |> Option.map int
                         }
                     with e -> Error (ApiError.Exception e)
                 )
@@ -808,6 +811,9 @@ module Api =
             deviceState.HeatingStats
             |> Option.iter (fun heating -> heatingCache |> Cache.set (deviceState.DeviceId |> DeviceId.shortId |> Key) heating)
 
+            deviceState.Value
+            |> Option.iter (fun v -> valueCache |> Cache.set (Key (zone, deviceState.DeviceId)) v)
+
             lastUpdated <- DateTimeOffset.Now
 
         let rec startLoadingState ((_, output) as io: IO) config zones: Async<unit> = async {
@@ -837,6 +843,15 @@ module Api =
             isOnCache
             |> Cache.items
             |> List.map (fun (Key (zone, device), isOn) -> zone, device, isOn)
+
+        let loadValueState key =
+            lastUpdated, valueCache |> Cache.tryFind (Key key)
+
+        let allValueStates () =
+            lastUpdated,
+            valueCache
+            |> Cache.items
+            |> List.map (fun (Key (zone, device), v) -> zone, device, v)
 
         let loadHeatingState key =
             printfn "[Heating] Loading state for %A" key
@@ -902,6 +917,7 @@ module Api =
             DeviceId = deviceState.Device
             IsOn = isOn
             HeatingStats = None
+            Value = match deviceState.State with | Density density -> Some density | _ -> None
         }
 
         output.Success "Done"

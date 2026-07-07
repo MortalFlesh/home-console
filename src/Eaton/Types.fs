@@ -272,9 +272,14 @@ module Device =
         | { Type = Actuator ShutterActuator } -> true
         | _ -> false
 
+    let isDimmer = function
+        | { Type = Actuator DimmerActuator } -> true
+        | _ -> false
+
     let isSwitch = function
         | { Type = Actuator HeatingActuator } -> false
         | { Type = Actuator ShutterActuator } -> false
+        | { Type = Actuator DimmerActuator } -> false
         | { Type = Actuator _ }
         | { Type = PushButton }  -> true
         | _ -> false

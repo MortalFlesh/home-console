@@ -5,6 +5,7 @@
 - Use net10.0
 - Generate Yaml template for HA in up-to-date format
 - Add cover as a specific type
+- Add dimmer lights
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values

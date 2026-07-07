@@ -105,3 +105,74 @@ module HaYaml =
                     )
                 )
         ]
+
+    let lightLines currentHost (dimmers: Device list) : string list =
+        let dimmerId (device: Device) =
+            device.DeviceId |> DeviceId.id
+
+        let dimmerChildren =
+            dimmers
+            |> List.collect (fun device -> device.Children)
+
+        let dimmerIds =
+            dimmerChildren
+            |> List.map dimmerId
+
+        [
+            "sensor:"
+            "  - platform: rest"
+            $"    resource: http://{currentHost}/brightness"
+            "    scan_interval: 60"
+            "    name: eaton_brightness"
+            "    value_template: OK"
+            "    json_attributes_path: \"$.Brightness\""
+            "    json_attributes:"
+            yield! dimmerIds |> List.map (fun id -> $"      - {id}")
+
+            ""
+            "rest_command:"
+            yield!
+                dimmerChildren
+                |> List.collect (fun device ->
+                    let room = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "unknown"
+                    let deviceId = device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value
+                    let id = dimmerId device
+                    [
+                        $"  eaton_{id}_set_level:"
+                        $"    url: \"http://{currentHost}/state\""
+                        "    method: POST"
+                        "    headers:"
+                        "      Content-Type: application/json"
+                        sprintf "    payload: '{\"room\": \"%s\", \"device\": \"%s\", \"density\": {{ brightness_pct }}}'" room deviceId
+                    ]
+                )
+
+            ""
+            "light:"
+            "  - platform: template"
+            "    lights:"
+            yield!
+                dimmerChildren
+                |> List.collect (fun device ->
+                    let id = dimmerId device
+                    [
+                        $"      eaton_light_{id}:"
+                        $"        friendly_name: \"{device.Name}\""
+                        $"        level_template: >-"
+                        $"          {{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) * 255 / 100 }}}}"
+                        $"        value_template: \"{{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) > 0 }}}}\""
+                        "        turn_on:"
+                        $"          action: rest_command.eaton_{id}_set_level"
+                        "          data:"
+                        "            brightness_pct: 100"
+                        "        turn_off:"
+                        $"          action: rest_command.eaton_{id}_set_level"
+                        "          data:"
+                        "            brightness_pct: 0"
+                        "        set_level:"
+                        $"          action: rest_command.eaton_{id}_set_level"
+                        "          data:"
+                        "            brightness_pct: \"{{ (brightness / 255 * 100) | round(0) }}\""
+                    ]
+                )
+        ]

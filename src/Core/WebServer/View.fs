@@ -96,6 +96,16 @@ module View =
                 ]
             ]
 
+        let private lightsRow currentHost (dimmers: Device list) =
+            div [ _class "row" ] [
+                div [ _class "col-md-12" ] [
+                    h3 [] [ str "Lights (dimmers)" ]
+                    p [] [ str "Add the sensor: block, then rest_command entries to your rest_command: section, and the light: block separately." ]
+                    HaYaml.lightLines currentHost dimmers
+                    |> htmlYaml
+                ]
+            ]
+
         let private switchesRow currentHost (scenes: Scene list) devices =
             div [ _class "row" ] [
                 div [ _class "col-md-12" ] [
@@ -186,6 +196,10 @@ module View =
                                 parameters.Devices
                                 |> List.filter Device.isCover
                                 |> coversRow parameters.CurrentHost
+
+                                parameters.Devices
+                                |> List.filter Device.isDimmer
+                                |> lightsRow parameters.CurrentHost
                             ]
                         ]
                     ]
