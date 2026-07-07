@@ -22,6 +22,7 @@
         <Compile Include="Config.fs" />
 
         <Compile Include="WebServer/Utils.fs" />
+        <Compile Include="WebServer/HaYaml.fs" />
         <Compile Include="WebServer/View.fs" />
         <Compile Include="WebServer/WebServer.fs" />
 

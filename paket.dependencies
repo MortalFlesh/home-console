@@ -13,6 +13,12 @@ nuget Feather.ErrorHandling ~> 2.0
 nuget Giraffe ~> 8.0
 nuget Saturn ~> 0.17
 
+// [ TESTS GROUP ]
+group Tests
+    source https://api.nuget.org/v3/index.json
+    nuget Expecto
+    nuget YoloDev.Expecto.TestSdk
+
 // [ FAKE GROUP ]
 group Build
     storage none

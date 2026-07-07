@@ -3,6 +3,7 @@
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
 - Use net10.0
+- Generate Yaml template for HA in up-to-date format
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values
