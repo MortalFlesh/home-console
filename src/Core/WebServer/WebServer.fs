@@ -51,6 +51,8 @@ module WebServer =
         )
     }
 
+    let mutable settingsCache: Settings = Settings.empty
+
     let mutable zonesCache: (Zone list) option = None
     let private loadZones (input, output) config = asyncResult {
         return!
@@ -108,9 +110,11 @@ module WebServer =
         let! (scenes: Scene list) = loadScenes (input, output) config
         let host = ctx.Request.Host.Host
 
+        let effectiveDevices = Settings.applyToDevices settingsCache devices
+
         return View.Html.index {
             CurrentHost = $"{host}:{port}"
-            Devices = devices
+            Devices = effectiveDevices
             Scenes = scenes
         }
     }
@@ -282,6 +286,34 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private getConfig: Action<_> = fun (input, output) config _ctx -> asyncResult {
+        let! (devices: Device list) = loadDevices (input, output) config
+        return View.Html.configPage {
+            Devices = devices
+            Settings = settingsCache
+        }
+    }
+
+    let private postConfig: Action<_> = fun _ config ctx -> asyncResult {
+        use reader = new System.IO.StreamReader(ctx.Request.Body)
+        let! body =
+            reader.ReadToEndAsync()
+            |> AsyncResult.ofTaskCatch ApiError.Exception
+
+        let! settings =
+            try
+                System.Text.Json.JsonSerializer.Deserialize<Settings>(body: string) |> Ok
+            with e -> Error (ApiError.Message e.Message)
+
+        settingsCache <- settings
+        let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+        do!
+            Store.save settingsPath settings
+            |> Async.map (Result.mapError ApiError.Exception)
+
+        return {| Status = "Ok" |}
+    }
+
     let private handleJsonAction (input, output) config (action: Action<_>) next ctx = task {
         ctx |> Debug.logCtx HttpContext.clientIP HttpContext.isHassioIngressRequest output
 
@@ -321,6 +353,9 @@ module WebServer =
         let handleJsonAction action = handleJsonAction (input, output) config action
         let handleHtmlAction action = handleHtmlAction (input, output) config action
 
+        let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+        settingsCache <- Store.tryLoad<Settings> settingsPath |> Option.defaultValue Settings.empty
+
         startWithRetry (input, output) config |> Async.Start
 
         return
@@ -353,6 +388,9 @@ module WebServer =
 
                     route "/health"
                         >=> handleJsonAction health
+
+                    route "/config"
+                        >=> handleHtmlAction getConfig
                 ]
 
                 POST >=> choose [
@@ -367,6 +405,9 @@ module WebServer =
 
                     route "/climate"
                         >=> handleJsonAction setClimateSetpoint
+
+                    route "/config"
+                        >=> handleJsonAction postConfig
                 ]
             ]
             |> app loggerFactory output port

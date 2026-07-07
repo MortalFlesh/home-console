@@ -288,6 +288,9 @@ module Device =
         | { Type = PushButton }  -> true
         | _ -> false
 
+    let effectiveName (device: Device) =
+        if device.DisplayName <> "" then device.DisplayName else device.Name
+
 [<RequireQualifiedAccess>]
 module DeviceStat =
     let value = function

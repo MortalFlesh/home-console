@@ -176,7 +176,7 @@ module View =
 
                                     [
                                         "  - platform: rest"
-                                        $"    name: Eaton - {switch.Name}"
+                                        $"    name: Eaton - {Device.effectiveName switch}"
                                         $"    resource: http://{currentHost}/state"
                                         $"    state_resource: http://{currentHost}/state/{room}/{deviceId}"
                                         sprintf "    body_on: '{\"room\": \"%s\", \"device\": \"%s\", %s}'" room deviceId state.On
@@ -211,6 +211,7 @@ module View =
                         div [ _class "row" ] [
                             div [ _class "col-md-12" ] [
                                 h1 [] [ str "Eaton Addon" ]
+                                p [] [ a [ _href "/config" ] [ str "⚙ Entity Settings" ] ]
                             ]
                         ]
                         div [ _class "row" ] [
@@ -239,6 +240,149 @@ module View =
 
                                 healthRow parameters.CurrentHost
                             ]
+                        ]
+                    ]
+                ]
+            ]
+
+        type ConfigParameters = {
+            Devices: Device list
+            Settings: Settings
+        }
+
+        let configPage (parameters: ConfigParameters) =
+            let settingsMap =
+                parameters.Settings.Entities
+                |> List.map (fun e -> e.DeviceId, e)
+                |> Map.ofList
+
+            let getVisible id =
+                settingsMap |> Map.tryFind id |> Option.map (fun e -> e.Visible) |> Option.defaultValue true
+
+            let getDisplayName id =
+                settingsMap |> Map.tryFind id |> Option.bind (fun e -> e.DisplayName) |> Option.defaultValue ""
+
+            let typeLabel = function
+                | Actuator HeatingActuator -> "Heating Actuator"
+                | Actuator ShutterActuator -> "Cover"
+                | Actuator DimmerActuator -> "Light"
+                | Actuator SwitchActuator -> "Switch"
+                | Sensor AnalogSensor -> "Sensor"
+                | Thermostat ThermostatSubType.RoomController -> "Climate"
+                | Thermostat ThermostatSubType.TemperatureSensor -> "Temperature Sensor"
+                | Thermostat ThermostatSubType.HumiditySensor -> "Humidity Sensor"
+                | Thermostat ThermostatSubType.Adjustment -> "Temp. Adjustment"
+                | PushButton -> "Push Button"
+                | Other _ -> "Other"
+
+            // Entities that appear in the generated YAML:
+            // - for heating: the parent RoomController is the climate entity
+            // - for all others: the children are the entities
+            let entitiesToConfigure =
+                parameters.Devices
+                |> List.collect (fun device ->
+                    if Device.isHeating device then
+                        let zone = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "-"
+                        [ zone, device ]
+                    else
+                        device.Children
+                        |> List.map (fun child ->
+                            let zone =
+                                child.Zone
+                                |> Option.orElse device.Zone
+                                |> Option.map ZoneId.value
+                                |> Option.defaultValue "-"
+                            zone, child
+                        )
+                )
+
+            html [] [
+                htmlHead
+                body [] [
+                    div [ _class "container"; _style "margin-top: 20px" ] [
+                        h1 [] [ str "Eaton Config" ]
+                        p [] [ a [ _href "/" ] [ str "← Back to index" ] ]
+                        h2 [] [ str "Entity Settings" ]
+                        p [] [ str "Toggle visibility and set custom display names. Invisible entities are excluded from the generated YAML." ]
+                        div [ _class "table-responsive" ] [
+                            table [ _class "table table-sm table-striped" ] [
+                                thead [] [
+                                    tr [] [
+                                        th [] [ str "Zone" ]
+                                        th [] [ str "Type" ]
+                                        th [] [ str "Eaton Name" ]
+                                        th [] [ str "Display Name Override" ]
+                                        th [] [ str "Visible" ]
+                                    ]
+                                ]
+                                tbody [] [
+                                    yield!
+                                        entitiesToConfigure
+                                        |> List.map (fun (zone, device) ->
+                                            let id = device.DeviceId |> DeviceId.id
+                                            let visible = getVisible id
+                                            let displayName = getDisplayName id
+
+                                            tr [] [
+                                                td [] [ str zone ]
+                                                td [] [ small [] [ str (typeLabel device.Type) ] ]
+                                                td [] [ code [] [ str device.Name ] ]
+                                                td [] [
+                                                    input [
+                                                        _type "text"
+                                                        _class "form-control form-control-sm"
+                                                        _name $"name_{id}"
+                                                        _placeholder device.Name
+                                                        _value displayName
+                                                    ]
+                                                ]
+                                                td [ _class "text-center" ] [
+                                                    input (
+                                                        [ _type "checkbox"; _name $"visible_{id}" ]
+                                                        @ (if visible then [ _checked ] else [])
+                                                    )
+                                                ]
+                                            ]
+                                        )
+                                ]
+                            ]
+                        ]
+                        button [ _class "btn btn-primary"; _onclick "saveConfig()" ] [ str "Save Settings" ]
+                        div [ _id "saveMsg"; _style "display:none; margin-top: 10px" ] []
+                        script [] [
+                            rawText """
+function saveConfig() {
+    var nameInputs = document.querySelectorAll('input[type="text"][name^="name_"]');
+    var entities = [];
+    nameInputs.forEach(function(el) {
+        var id = el.name.replace(/^name_/, '');
+        var checkboxEl = document.querySelector('input[type="checkbox"][name="visible_' + id + '"]');
+        var visible = checkboxEl ? checkboxEl.checked : true;
+        var displayName = el.value.trim();
+        entities.push({ DeviceId: id, Visible: visible, DisplayName: displayName.length > 0 ? displayName : null });
+    });
+    fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Entities: entities })
+    }).then(function(r) {
+        var msg = document.getElementById('saveMsg');
+        msg.style.display = 'block';
+        if (r.ok) {
+            msg.className = 'alert alert-success';
+            msg.textContent = 'Settings saved! Reload the index page to see updated YAML.';
+        } else {
+            msg.className = 'alert alert-danger';
+            msg.textContent = 'Error saving settings.';
+        }
+    }).catch(function(e) {
+        var msg = document.getElementById('saveMsg');
+        msg.style.display = 'block';
+        msg.className = 'alert alert-danger';
+        msg.textContent = 'Network error: ' + e.message;
+    });
+}
+"""
                         ]
                     ]
                 ]

@@ -43,7 +43,7 @@ module HaYaml =
                     let id = coverId device
                     [
                         $"      eaton_cover_{id}:"
-                        $"        friendly_name: \"{device.Name}\""
+                        $"        friendly_name: \"{Device.effectiveName device}\""
                         "        open_cover:"
                         $"          action: rest_command.eaton_{id}_open"
                         "        close_cover:"
@@ -84,7 +84,7 @@ module HaYaml =
 
                                     [
                                         $"      - unique_id: {name}_{metric}"
-                                        $"        name: \"{sensor.Name} ({metric})\""
+                                        $"        name: \"{Device.effectiveName sensor} ({metric})\""
                                         $"        state: \"{valueTemplate}\""
                                         $"        unit_of_measurement: \"{heating.Unit}\""
                                         $"        device_class: {heating.DeviceClass}"
@@ -93,7 +93,7 @@ module HaYaml =
                             )
                             @ [
                                 $"      - unique_id: {name}_last_update"
-                                $"        name: \"{sensor.Name} (last update)\""
+                                $"        name: \"{Device.effectiveName sensor} (last update)\""
                                 $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
                                 "        device_class: timestamp"
                             ]
@@ -105,12 +105,12 @@ module HaYaml =
 
                             [
                                 $"      - unique_id: {name}"
-                                $"        name: \"{sensor.Name}\""
+                                $"        name: \"{Device.effectiveName sensor}\""
                                 $"        state: \"{valueTemplate}\""
                                 $"        unit_of_measurement: \"{unitOfMeasurement}\""
                                 $"        device_class: {valueType}"
                                 $"      - unique_id: {name}_last_update"
-                                $"        name: \"{sensor.Name} (last update)\""
+                                $"        name: \"{Device.effectiveName sensor} (last update)\""
                                 $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
                                 "        device_class: timestamp"
                             ]
@@ -171,7 +171,7 @@ module HaYaml =
                     let id = dimmerId device
                     [
                         $"      eaton_light_{id}:"
-                        $"        friendly_name: \"{device.Name}\""
+                        $"        friendly_name: \"{Device.effectiveName device}\""
                         $"        level_template: >-"
                         $"          {{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) * 255 / 100 }}}}"
                         $"        value_template: \"{{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) > 0 }}}}\""
@@ -248,7 +248,7 @@ module HaYaml =
                         let sensorName = $"eaton_climate_{id}"
                         let restCommandName = $"eaton_climate_{id}_set_temp"
                         let climateId = $"eaton_climate_{id}"
-                        let name = if device.Name |> System.String.IsNullOrWhiteSpace then device.DisplayName else device.Name
+                        let name = Device.effectiveName device
                         [
                             $"      {climateId}:"
                             $"        friendly_name: \"{name}\""

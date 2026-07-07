@@ -19,6 +19,11 @@
 - Expose `Version` and `Status` (ok/degraded) in `/health` response (Feature A3)
 - Retry initial Eaton zone load with exponential backoff (5 s → 60 s) instead of crashing (Feature S1)
 - Start HTTP server immediately so `/health` is reachable while Eaton is still unreachable (Feature S1)
+- Add `EntitySetting` / `Settings` model persisted to `<data>/settings.json` (Feature C1)
+- Add `GET /config` page: table of all entities with visibility toggles and display-name overrides (Feature C1)
+- Add `POST /config` endpoint: saves updated settings to disk, reloads in memory (Feature C1)
+- Apply settings on the index page: invisible entities are excluded and display-name overrides are used in all generated YAML (Feature C1)
+- Add `Device.effectiveName` helper: returns `DisplayName` when set, falls back to `Name` (Feature C1)
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values
