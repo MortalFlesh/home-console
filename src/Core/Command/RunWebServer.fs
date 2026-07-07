@@ -10,8 +10,8 @@ module RunWebServerCommand =
     open Microsoft.Extensions.Logging
     open Giraffe
     open Saturn
-    open MF.ConsoleApplication
-    open MF.ErrorHandling
+    open Feather.ConsoleApplication
+    open Feather.ErrorHandling
     open MF.Utils
     open MF.Utils.Logging
     open MF.HomeConsole.Console

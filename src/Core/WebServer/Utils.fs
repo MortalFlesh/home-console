@@ -105,7 +105,7 @@ module Utils =
 
     [<RequireQualifiedAccess>]
     module Debug =
-        let logCtx clientIp isHassioIngressRequest (output: MF.ConsoleApplication.Output) (ctx: HttpContext) =
+        let logCtx clientIp isHassioIngressRequest (output: Feather.ConsoleApplication.Output) (ctx: HttpContext) =
             if output.IsDebug() then
                 let path = (try ctx.Request.Path.Value |> string with _ -> "-")
 

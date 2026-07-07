@@ -5,8 +5,8 @@ module DownloadEatonHistory =
     open System
     open FSharp.Data
     open MF.HomeConsole.Console
-    open MF.ConsoleApplication
-    open MF.ErrorHandling
+    open Feather.ConsoleApplication
+    open Feather.ErrorHandling
     open MF.Eaton
 
     let arguments = []

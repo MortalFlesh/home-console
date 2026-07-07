@@ -17,14 +17,14 @@ jobs:
             run: ./build.sh
           - name: windows-latest
             run: ./build.cmd
-        dotnet: [8.x]
+        dotnet: [10.x]
     runs-on: ${{ matrix.os.name }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ matrix.dotnet }}
 
@@ -40,14 +40,14 @@ jobs:
         os:
           - name: macos-latest
             run: ./build.sh
-        dotnet: [8.x]
+        dotnet: [10.x]
     runs-on: ${{ matrix.os.name }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ matrix.dotnet }}
 

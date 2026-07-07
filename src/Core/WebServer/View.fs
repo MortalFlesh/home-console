@@ -90,18 +90,19 @@ module View =
                                     | Actuator HeatingActuator ->
                                         [
                                             {| Metric = "temperature"; Unit = "°C"; DeviceClass = "temperature" |}
-                                            {| Metric = "power_percentage"; Unit = "%"; DeviceClass = "value" |}
-                                            {| Metric = "power"; Unit = "W"; DeviceClass = "value" |}
+                                            {| Metric = "power_percentage"; Unit = "%"; DeviceClass = "power_factor" |}
+                                            {| Metric = "power"; Unit = "W"; DeviceClass = "power" |}
                                             {| Metric = "overload"; Unit = ""; DeviceClass = "value" |}
                                         ]
                                         |> List.collect (fun heating ->
                                             let metric = heating.Metric
+                                            let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId metric
 
                                             [
                                                 $"      {name}_{metric}:"
                                                 $"        unique_id: {name}_{metric}"
                                                 $"        friendly_name: \"{sensor.Name} ({metric})\""
-                                                $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{metric}'] | float }}\""
+                                                $"        value_template: \"{valueTemplate}\""
                                                 $"        unit_of_measurement: \"{heating.Unit}\""
                                                 $"        device_class: {heating.DeviceClass}"
                                                 "        entity_id: sensor.eaton"
@@ -111,12 +112,13 @@ module View =
                                     | _ ->
                                         let valueType = sensor.Type |> DeviceType.valueType
                                         let unitOfMeasurement = sensor.Type |> DeviceType.unitOfMeasure |> Option.defaultValue "... add manually ..."
+                                        let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId valueType
 
                                         [
                                             $"      {name}:"
                                             $"        unique_id: {name}"
                                             $"        friendly_name: \"{sensor.Name}\""
-                                            $"        value_template: \"{{ state_attr('sensor.eaton', '{deviceId}')['{valueType}'] | float }}\""
+                                            $"        value_template: \"{valueTemplate}\""
                                             $"        unit_of_measurement: \"{unitOfMeasurement}\""
                                             $"        device_class: {valueType}"
                                             "        entity_id: sensor.eaton"

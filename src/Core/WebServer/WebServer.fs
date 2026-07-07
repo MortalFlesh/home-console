@@ -12,9 +12,9 @@ module WebServer =
     open Giraffe
     open Saturn
 
-    open MF.ConsoleApplication
+    open Feather.ConsoleApplication
     open MF.Utils
-    open MF.ErrorHandling
+    open Feather.ErrorHandling
     open MF.HomeConsole
     open MF.Eaton
 

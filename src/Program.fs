@@ -1,6 +1,6 @@
 open System
-open MF.ConsoleStyle
-open MF.ConsoleApplication
+open Feather.ConsoleStyle
+open Feather.ConsoleApplication
 open MF.HomeConsole
 
 [<EntryPoint>]

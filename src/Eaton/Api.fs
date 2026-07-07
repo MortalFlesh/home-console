@@ -10,13 +10,13 @@ module Api =
 
     open FSharp.Data
 
-    open MF.ConsoleApplication
+    open Feather.ConsoleApplication
     open MF.Utils
     open MF.Utils.Option.Operators
-    open MF.ErrorHandling
+    open Feather.ErrorHandling
     open MF.JsonRpc
 
-    type IO = MF.ConsoleApplication.IO
+    type IO = Feather.ConsoleApplication.IO
 
     let mutable private cookies = CookieContainer()
 
@@ -301,7 +301,7 @@ module Api =
     type private DeviceInZoneItemSchema = JsonProvider<"schema/deviceInZoneItem.json", SampleIsList = true>
     type private SceneItemSchema = JsonProvider<"schema/sceneItem.json", SampleIsList = true>
 
-    open MF.ErrorHandling.Option.Operators
+    open Feather.ErrorHandling.Option.Operators
 
     let getZoneList ((_, output) as io: IO) (config: EatonConfig): AsyncResult<Zone list, ApiError> =
         asyncResult {
@@ -824,7 +824,7 @@ module Api =
                 |> AsyncResult.ofSequentialAsyncResults ApiError.Exception
                 |> Async.Ignore
 
-            do! Async.Sleep (TimeSpan.FromSeconds 10)
+            do! Async.Sleep (TimeSpan.FromSeconds 10.)
 
             return! zones |> startLoadingState io config
         }

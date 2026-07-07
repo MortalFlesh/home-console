@@ -1,7 +1,7 @@
 namespace MF.HomeConsole
 
 module Console =
-    open MF.ConsoleApplication
+    open Feather.ConsoleApplication
 
     (* [<RequireQualifiedAccess>]
     module Argument =

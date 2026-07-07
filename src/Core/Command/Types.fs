@@ -1,6 +1,6 @@
 namespace MF.HomeConsole
 
-open MF.ConsoleApplication
+open Feather.ConsoleApplication
 
 [<RequireQualifiedAccess>]
 module CommandError =
@@ -11,12 +11,12 @@ module CommandError =
 
 [<AutoOpen>]
 module Execute =
-    open MF.ErrorHandling.AsyncResult.Operators
+    open Feather.ErrorHandling.AsyncResult.Operators
 
     let executeAsyncResult execute =
         ExecuteAsyncResult (execute >@> ConsoleApplicationError.CommandError)
 
-    open MF.ErrorHandling.Result.Operators
+    open Feather.ErrorHandling.Result.Operators
 
     let executeResult execute =
         ExecuteResult (execute >@> ConsoleApplicationError.CommandError)

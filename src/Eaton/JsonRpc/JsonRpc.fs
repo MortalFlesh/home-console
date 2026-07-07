@@ -12,7 +12,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 
-open MF.ErrorHandling
+open Feather.ErrorHandling
 
 open FSharp.Data
 open Giraffe

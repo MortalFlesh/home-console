@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Use net10.0
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values
