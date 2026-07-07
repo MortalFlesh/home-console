@@ -15,6 +15,10 @@
 - Add `Store` module: atomic, thread-safe JSON load/save for all persisted state
 - Derive `--cookies-path` and `--history-path` defaults from the data directory
 - Extend `Config` with `DataConfig` carrying the resolved data directory
+- Show version, data dir and port on web-server start (Feature A3)
+- Expose `Version` and `Status` (ok/degraded) in `/health` response (Feature A3)
+- Retry initial Eaton zone load with exponential backoff (5 s → 60 s) instead of crashing (Feature S1)
+- Start HTTP server immediately so `/health` is reachable while Eaton is still unreachable (Feature S1)
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values

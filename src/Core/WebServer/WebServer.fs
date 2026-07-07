@@ -254,10 +254,18 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private version =
+        System.Reflection.Assembly.GetEntryAssembly()
+        |> Option.ofObj
+        |> Option.map (fun a -> a.GetName().Version |> string)
+        |> Option.defaultValue "unknown"
+
     let private health: Action<_> = fun _ _ _ -> asyncResult {
+        let status = if zonesCache.IsSome then "ok" else "degraded"
         return {|
-            Status = "ok"
+            Status = status
             LastUpdated = Api.DeviceStates.lastUpdated
+            Version = version
         |}
     }
 
@@ -290,16 +298,30 @@ module WebServer =
         | Error error -> return! (json error >=> setStatusCode 400) next ctx
     }
 
+    let private startWithRetry (input, output) config = async {
+        let backoffMs = [| 5_000; 10_000; 20_000; 40_000; 60_000 |]
+        let mutable attempt = 0
+        let mutable loaded = false
+        while not loaded do
+            match! loadZones (input, output) config with
+            | Ok zones ->
+                zones
+                |> List.map (fun zone -> zone.Id)
+                |> Api.DeviceStates.startLoadingState (input, output) config.Eaton
+                |> Async.Start
+                loaded <- true
+            | Error err ->
+                let delay = backoffMs[min attempt (backoffMs.Length - 1)]
+                output.Warning(sprintf "Eaton not reachable (attempt %d), retrying in %d s: %A" (attempt + 1) (delay / 1000) err)
+                do! Async.Sleep delay
+                attempt <- attempt + 1
+    }
+
     let run loggerFactory (input, output) (config: Config) port: AsyncResult<unit, ApiError> = asyncResult {
         let handleJsonAction action = handleJsonAction (input, output) config action
         let handleHtmlAction action = handleHtmlAction (input, output) config action
 
-        let! (zones: Zone list) = loadZones (input, output) config
-
-        zones
-        |> List.map (fun zone -> zone.Id)
-        |> Api.DeviceStates.startLoadingState (input, output) config.Eaton
-        |> Async.Start
+        startWithRetry (input, output) config |> Async.Start
 
         return
             [
