@@ -268,8 +268,13 @@ module Device =
         | { Type = Sensor _ } -> true
         | _ -> false
 
+    let isCover = function
+        | { Type = Actuator ShutterActuator } -> true
+        | _ -> false
+
     let isSwitch = function
         | { Type = Actuator HeatingActuator } -> false
+        | { Type = Actuator ShutterActuator } -> false
         | { Type = Actuator _ }
         | { Type = PushButton }  -> true
         | _ -> false

@@ -7,6 +7,54 @@ module HaYaml =
     open MF.HomeConsole
     open MF.Utils
 
+    let coverLines currentHost (covers: Device list) : string list =
+        let coverId (device: Device) =
+            device.DeviceId |> DeviceId.id
+
+        let restCommandEntries (device: Device) =
+            let room = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "unknown"
+            let deviceId = device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value
+            let id = coverId device
+            [ "open"; "close"; "stop" ]
+            |> List.collect (fun action -> [
+                $"  eaton_{id}_{action}:"
+                $"    url: \"http://{currentHost}/state\""
+                "    method: POST"
+                "    headers:"
+                "      Content-Type: application/json"
+                sprintf "    payload: '{\"room\": \"%s\", \"device\": \"%s\", \"state\": \"%s\"}'" room deviceId action
+            ])
+
+        let coverChildren =
+            covers
+            |> List.collect (fun device -> device.Children)
+
+        [
+            "rest_command:"
+            yield! coverChildren |> List.collect restCommandEntries
+
+            ""
+            "cover:"
+            "  - platform: template"
+            "    covers:"
+            yield!
+                coverChildren
+                |> List.collect (fun device ->
+                    let id = coverId device
+                    [
+                        $"      eaton_cover_{id}:"
+                        $"        friendly_name: \"{device.Name}\""
+                        "        open_cover:"
+                        $"          action: rest_command.eaton_{id}_open"
+                        "        close_cover:"
+                        $"          action: rest_command.eaton_{id}_close"
+                        "        stop_cover:"
+                        $"          action: rest_command.eaton_{id}_stop"
+                    ]
+                )
+        ]
+
+
     let templateSensorLines (sensors: Device list) : string list =
         [
             ""

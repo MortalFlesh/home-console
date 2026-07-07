@@ -86,6 +86,16 @@ module View =
             Off: string
         }
 
+        let private coversRow currentHost (covers: Device list) =
+            div [ _class "row" ] [
+                div [ _class "col-md-12" ] [
+                    h3 [] [ str "Covers (shutters, blinds, awnings)" ]
+                    p [] [ str "Add rest_command entries to your rest_command: section, and the cover: block separately." ]
+                    HaYaml.coverLines currentHost covers
+                    |> htmlYaml
+                ]
+            ]
+
         let private switchesRow currentHost (scenes: Scene list) devices =
             div [ _class "row" ] [
                 div [ _class "col-md-12" ] [
@@ -172,6 +182,10 @@ module View =
                                 parameters.Devices
                                 |> List.filter Device.isSwitch
                                 |> switchesRow parameters.CurrentHost parameters.Scenes
+
+                                parameters.Devices
+                                |> List.filter Device.isCover
+                                |> coversRow parameters.CurrentHost
                             ]
                         ]
                     ]
