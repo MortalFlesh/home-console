@@ -7,6 +7,10 @@
 - Add cover as a specific type
 - Add dimmer lights
 - Add climate template
+- Add `/health` endpoint (Feature 6): liveness check returning `Status` and `LastUpdated`
+- Generate `binary_sensor.eaton_bridge` YAML snippet on the index page
+- Fix `last_update` in `/sensors` to emit ISO-8601 timestamps (Feature 5)
+- Generate `*_last_update` template sensors (device_class: timestamp) on the index page
 
 ## 1.17.1 - 2024-10-28
 - Fix formatting float values

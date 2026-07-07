@@ -71,24 +71,32 @@ module HaYaml =
 
                         match sensor.Type with
                         | Actuator HeatingActuator ->
-                            [
-                                {| Metric = "temperature"; Unit = "°C"; DeviceClass = "temperature" |}
-                                {| Metric = "power_percentage"; Unit = "%"; DeviceClass = "power_factor" |}
-                                {| Metric = "power"; Unit = "W"; DeviceClass = "power" |}
-                                {| Metric = "overload"; Unit = ""; DeviceClass = "value" |}
-                            ]
-                            |> List.collect (fun heating ->
-                                let metric = heating.Metric
-                                let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId metric
-
+                            (
                                 [
-                                    $"      - unique_id: {name}_{metric}"
-                                    $"        name: \"{sensor.Name} ({metric})\""
-                                    $"        state: \"{valueTemplate}\""
-                                    $"        unit_of_measurement: \"{heating.Unit}\""
-                                    $"        device_class: {heating.DeviceClass}"
+                                    {| Metric = "temperature"; Unit = "°C"; DeviceClass = "temperature" |}
+                                    {| Metric = "power_percentage"; Unit = "%"; DeviceClass = "power_factor" |}
+                                    {| Metric = "power"; Unit = "W"; DeviceClass = "power" |}
+                                    {| Metric = "overload"; Unit = ""; DeviceClass = "value" |}
                                 ]
+                                |> List.collect (fun heating ->
+                                    let metric = heating.Metric
+                                    let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId metric
+
+                                    [
+                                        $"      - unique_id: {name}_{metric}"
+                                        $"        name: \"{sensor.Name} ({metric})\""
+                                        $"        state: \"{valueTemplate}\""
+                                        $"        unit_of_measurement: \"{heating.Unit}\""
+                                        $"        device_class: {heating.DeviceClass}"
+                                    ]
+                                )
                             )
+                            @ [
+                                $"      - unique_id: {name}_last_update"
+                                $"        name: \"{sensor.Name} (last update)\""
+                                $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
+                                "        device_class: timestamp"
+                            ]
 
                         | _ ->
                             let valueType = sensor.Type |> DeviceType.valueType
@@ -101,6 +109,10 @@ module HaYaml =
                                 $"        state: \"{valueTemplate}\""
                                 $"        unit_of_measurement: \"{unitOfMeasurement}\""
                                 $"        device_class: {valueType}"
+                                $"      - unique_id: {name}_last_update"
+                                $"        name: \"{sensor.Name} (last update)\""
+                                $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
+                                "        device_class: timestamp"
                             ]
                     )
                 )
@@ -228,3 +240,14 @@ module HaYaml =
             )
         )
         |> List.collect id
+
+    let healthLines currentHost : string list =
+        [
+            "binary_sensor:"
+            "  - platform: rest"
+            $"    resource: http://{currentHost}/health"
+            "    name: eaton_bridge"
+            "    value_template: \"{{{{ value_json.Status == 'ok' }}}}\""
+            "    device_class: connectivity"
+            "    scan_interval: 60"
+        ]

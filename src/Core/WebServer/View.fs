@@ -116,6 +116,16 @@ module View =
                 ]
             ]
 
+        let private healthRow currentHost =
+            div [ _class "row" ] [
+                div [ _class "col-md-12" ] [
+                    h3 [] [ str "Bridge health sensor" ]
+                    p [] [ str "Optional: monitors whether the Eaton bridge is reachable from Home Assistant." ]
+                    HaYaml.healthLines currentHost
+                    |> htmlYaml
+                ]
+            ]
+
         let private switchesRow currentHost (scenes: Scene list) devices =
             div [ _class "row" ] [
                 div [ _class "col-md-12" ] [
@@ -214,6 +224,8 @@ module View =
                                 parameters.Devices
                                 |> List.filter Device.isHeating
                                 |> climateRow parameters.CurrentHost
+
+                                healthRow parameters.CurrentHost
                             ]
                         ]
                     ]

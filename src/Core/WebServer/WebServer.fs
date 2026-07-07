@@ -12,6 +12,8 @@ module WebServer =
     open Giraffe
     open Saturn
 
+    open System
+
     open Feather.ConsoleApplication
     open MF.Utils
     open Feather.ErrorHandling
@@ -145,12 +147,12 @@ module WebServer =
                                 "power", heating.Power |> sprintf "%.1f"
                                 "overload", heating.Overload.ToString()
 
-                                "last_update", lastUpdate.ToString("HH:mm:ss")
+                                "last_update", lastUpdate.ToString("o")
                             | _ ->
                             match stat device.DeviceId with
                             | Some value ->
                                 device.Type |> DeviceType.valueType, value.EventLog |> DeviceStat.value
-                                "last_update", value.LastMsgTimeStamp.ToString()
+                                "last_update", (DateTimeOffset.Now - value.LastMsgTimeStamp).ToString("o")
                             | _ -> ()
                         ]
                     )
@@ -252,6 +254,13 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private health: Action<_> = fun _ _ _ -> asyncResult {
+        return {|
+            Status = "ok"
+            LastUpdated = Api.DeviceStates.lastUpdated
+        |}
+    }
+
     let private triggerMacro: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -319,6 +328,9 @@ module WebServer =
 
                     routef "/climate/%s"
                         (getClimateDashboard >> handleJsonAction)
+
+                    route "/health"
+                        >=> handleJsonAction health
                 ]
 
                 POST >=> choose [
