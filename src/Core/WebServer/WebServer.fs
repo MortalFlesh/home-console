@@ -188,14 +188,23 @@ module WebServer =
         |}
     }
 
-    let private brightnessStats: Action<_> = fun _ _ _ -> asyncResult {
+    let private brightnessStats: Action<_> = fun (input, output) config _ -> asyncResult {
+        let! (devices: Device list) = loadDevices (input, output) config
         let lastUpdated, values = Api.DeviceStates.allValueStates ()
+
+        // the value cache is keyed by the state-response id (xCo:... form); map it back to the
+        // device-list id (hdm:... form) so /brightness keys match /sensors and the light template
+        let idMap =
+            devices
+            |> List.collect (fun device -> device.Children)
+            |> List.map (fun device -> DeviceId (device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value), device.DeviceId |> DeviceId.id)
+            |> Map.ofList
 
         return {|
             Updated = lastUpdated
             Brightness =
                 values
-                |> List.map (fun (_, device, v) -> device |> DeviceId.id, v)
+                |> List.choose (fun (_, device, v) -> idMap |> Map.tryFind device |> Option.map (fun haId -> haId, v))
                 |> Map.ofList
         |}
     }
@@ -301,14 +310,15 @@ module WebServer =
             |> AsyncResult.ofTaskCatch ApiError.Exception
 
         let! settings =
-            try
-                System.Text.Json.JsonSerializer.Deserialize<Settings>(body: string) |> Ok
-            with e -> Error (ApiError.Message e.Message)
+            body
+            |> Settings.tryParse
+            |> Result.mapError ApiError.Message
 
         settingsCache <- settings
         let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
         do!
-            Store.save settingsPath settings
+            Settings.serialize settings
+            |> Store.saveText settingsPath
             |> Async.map (Result.mapError ApiError.Exception)
 
         return {| Status = "Ok" |}
@@ -354,7 +364,10 @@ module WebServer =
         let handleHtmlAction action = handleHtmlAction (input, output) config action
 
         let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
-        settingsCache <- Store.tryLoad<Settings> settingsPath |> Option.defaultValue Settings.empty
+        settingsCache <-
+            Store.tryLoadText settingsPath
+            |> Option.map Settings.parse
+            |> Option.defaultValue Settings.empty
 
         startWithRetry (input, output) config |> Async.Start
 

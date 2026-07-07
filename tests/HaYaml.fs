@@ -48,6 +48,10 @@ let haYamlTests =
                 "        state: \"{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_1234_u0')['value'] | float }}\""
                 "        unit_of_measurement: \"... add manually ...\""
                 "        device_class: value"
+                "      - unique_id: eaton_living_room_last_update"
+                "        name: \"Living Room (last update)\""
+                "        state: \"{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_1234_u0')['last_update'] }}\""
+                "        device_class: timestamp"
             ] "analog sensor lines"
         }
 
@@ -80,6 +84,10 @@ let haYamlTests =
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['overload'] | float }}}}\""
                 "        unit_of_measurement: \"\""
                 "        device_class: value"
+                "      - unique_id: eaton_room_heating_last_update"
+                "        name: \"Room Heating (last update)\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['last_update'] }}}}\""
+                "        device_class: timestamp"
             ] "heating actuator all metric lines"
         }
 

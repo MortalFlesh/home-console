@@ -119,10 +119,8 @@ module HaYaml =
         ]
 
     let lightLines currentHost (dimmers: Device list) : string list =
-        // NOTE: the /brightness endpoint keys values by the state-response id (xCo:... form),
-        // so the HA attribute keys must be derived from the short id, not the device-list id (hdm:... form)
         let dimmerId (device: Device) =
-            DeviceId (device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value) |> DeviceId.id
+            device.DeviceId |> DeviceId.id
 
         let dimmerChildren =
             dimmers

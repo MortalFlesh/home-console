@@ -23,7 +23,46 @@ type Settings = {
 
 [<RequireQualifiedAccess>]
 module Settings =
+    open FSharp.Data
+
+    type private SettingsSchema = JsonProvider<"schema/settings.json">
+
     let empty : Settings = { Entities = [] }
+
+    let tryParse (json: string) : Result<Settings, string> =
+        try
+            let parsed = SettingsSchema.Parse json
+            Ok {
+                Entities =
+                    parsed.Entities
+                    |> Array.map (fun e -> {
+                        DeviceId = e.DeviceId
+                        Visible = e.Visible
+                        DisplayName = e.DisplayName
+                    })
+                    |> List.ofArray
+            }
+        with e -> Error e.Message
+
+    let parse (json: string) : Settings =
+        match tryParse json with
+        | Ok settings -> settings
+        | Error _ -> empty
+
+    let serialize (settings: Settings) : string =
+        let entity (e: EntitySetting) =
+            [
+                yield "DeviceId", JsonValue.String e.DeviceId
+                yield "Visible", JsonValue.Boolean e.Visible
+                match e.DisplayName with
+                | Some name -> yield "DisplayName", JsonValue.String name
+                | None -> ()
+            ]
+            |> Array.ofList
+            |> JsonValue.Record
+
+        JsonValue.Record [| "Entities", settings.Entities |> List.map entity |> Array.ofList |> JsonValue.Array |]
+        |> fun json -> json.ToString()
 
     let applyToDevices (settings: Settings) (devices: Device list) : Device list =
         let settingsMap =

@@ -1,0 +1,13 @@
+{
+    "Entities": [
+        {
+            "DeviceId": "hdm_xComfort_Adapter_1234_u0",
+            "Visible": true,
+            "DisplayName": "Kitchen Light"
+        },
+        {
+            "DeviceId": "hdm_xComfort_Adapter_5678_u0",
+            "Visible": false
+        }
+    ]
+}
