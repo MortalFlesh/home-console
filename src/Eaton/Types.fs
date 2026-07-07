@@ -276,6 +276,10 @@ module Device =
         | { Type = Actuator DimmerActuator } -> true
         | _ -> false
 
+    let isHeating = function
+        | { Type = Thermostat ThermostatSubType.RoomController } -> true
+        | _ -> false
+
     let isSwitch = function
         | { Type = Actuator HeatingActuator } -> false
         | { Type = Actuator ShutterActuator } -> false

@@ -993,3 +993,126 @@ module Api =
 
             return ()
         }
+
+    type ClimateSetpoint = {
+        Room: ZoneId
+        Temperature: decimal
+    }
+
+    [<RequireQualifiedAccess>]
+    module ClimateSetpoint =
+        open Microsoft.AspNetCore.Http
+
+        type private ClimateSetpointSchema = JsonProvider<"schema/climateSetpointRequest.json">
+
+        let parse (ctx: HttpContext) = asyncResult {
+            use reader = new StreamReader(ctx.Request.Body)
+
+            let! body =
+                reader.ReadToEndAsync()
+                |> AsyncResult.ofTaskCatch string
+
+            let! parsed =
+                try body |> ClimateSetpointSchema.Parse |> Ok
+                with e -> Error e.Message
+
+            return {
+                Room = ZoneId parsed.Room
+                Temperature = decimal parsed.Temperature
+            }
+        }
+
+    [<RequireQualifiedAccess>]
+    module ClimateFunction =
+        type private ClimateDashboardSchema = JsonProvider<"schema/climateDashboardResult.json">
+
+        type ClimateDashboard = {
+            Zone: ZoneId
+            Current: float
+            Target: float
+            Mode: string
+            TypeId: string
+        }
+
+        let private parseNumber (value: string) =
+            Double.Parse(value, Globalization.CultureInfo.InvariantCulture)
+
+        let private parseDashboard zone (json: string) =
+            try
+                let parsed = json |> ClimateDashboardSchema.Parse
+                Ok {
+                    Zone = zone
+                    Current = parsed.Temperature |> string |> parseNumber
+                    Target = parsed.Setpoint |> string |> parseNumber
+                    Mode = parsed.Mode
+                    TypeId = parsed.TypeId
+                }
+            with e -> Error (ApiError.Exception e)
+
+        let getDashboard ((_, output) as io: IO) (config: EatonConfig) (zone: ZoneId) =
+            asyncResult {
+                do! login io config
+
+                output.Section ("[Eaton][Climate] Get Dashboard for zone %s", zone |> ZoneId.value)
+                let! response =
+                    [ zone |> ZoneId.value ]
+                    :> obj
+                    |> Dto
+                    |> RPC.Request.create "ClimateFunction/getDashboard"
+                    |> RPC.call config
+
+                let! resultJson =
+                    response
+                    |> Response.tryParseResultAsJsonString
+                    |> Result.ofOption (ApiError.Message "Empty climate dashboard response")
+
+                return! parseDashboard zone resultJson
+            }
+            |> retryOnUnauthorized io config
+
+        let rec private callSpSteps config (zone: ZoneId) rpcMethod (remaining: int) : AsyncResult<unit, ApiError> =
+            if remaining <= 0 then
+                AsyncResult.ofSuccess ()
+            else
+                asyncResult {
+                    let! _ =
+                        [ zone |> ZoneId.value ]
+                        :> obj
+                        |> Dto
+                        |> RPC.Request.create rpcMethod
+                        |> RPC.call config
+                    return! callSpSteps config zone rpcMethod (remaining - 1)
+                }
+
+        let setSetpoint ((_, output) as io: IO) (config: EatonConfig) (zone: ZoneId) (target: decimal) =
+            asyncResult {
+                do! login io config
+
+                let! response =
+                    [ zone |> ZoneId.value ]
+                    :> obj
+                    |> Dto
+                    |> RPC.Request.create "ClimateFunction/getDashboard"
+                    |> RPC.call config
+
+                let! resultJson =
+                    response
+                    |> Response.tryParseResultAsJsonString
+                    |> Result.ofOption (ApiError.Message "Empty climate dashboard response")
+
+                let! dashboard = parseDashboard zone resultJson
+
+                let diff: float = float target - dashboard.Target
+                // NOTE: `/` is shadowed by a custom Path.Combine operator in this module, so use `* 2.0` (== `/ 0.5`) for the 0.5°C step size
+                let steps: int = int (System.Math.Round(diff * 2.0, System.MidpointRounding.AwayFromZero))
+
+                if steps <> 0 then
+                    let rpcMethod, count =
+                        if steps > 0 then "ClimateFunction/spIncrease", steps
+                        else "ClimateFunction/spDecrease", -steps
+
+                    output.Section <| sprintf "[Eaton][Climate] Setting setpoint in zone %s: %s x%d (%.1f->%.1f)" (zone |> ZoneId.value) rpcMethod count dashboard.Target (float target)
+
+                    do! callSpSteps config zone rpcMethod count
+            }
+            |> retryOnUnauthorized io config

@@ -106,6 +106,16 @@ module View =
                 ]
             ]
 
+        let private climateRow currentHost (heatings: Device list) =
+            div [ _class "row" ] [
+                div [ _class "col-md-12" ] [
+                    h3 [] [ str "Climate (floor heating)" ]
+                    p [] [ str "One block per room controller. Add the sensor:, rest_command:, and climate: blocks separately." ]
+                    HaYaml.climateLines currentHost heatings
+                    |> htmlYaml
+                ]
+            ]
+
         let private switchesRow currentHost (scenes: Scene list) devices =
             div [ _class "row" ] [
                 div [ _class "col-md-12" ] [
@@ -200,6 +210,10 @@ module View =
                                 parameters.Devices
                                 |> List.filter Device.isDimmer
                                 |> lightsRow parameters.CurrentHost
+
+                                parameters.Devices
+                                |> List.filter Device.isHeating
+                                |> climateRow parameters.CurrentHost
                             ]
                         ]
                     ]

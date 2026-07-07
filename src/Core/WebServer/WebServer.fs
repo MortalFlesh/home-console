@@ -230,6 +230,28 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private getClimateDashboard (zone: string) : Action<_> = fun (input, output) config _ -> asyncResult {
+        let! (dashboard: Api.ClimateFunction.ClimateDashboard) = Api.ClimateFunction.getDashboard (input, output) config.Eaton (ZoneId zone)
+
+        return {|
+            Temperature = dashboard.Current
+            Setpoint = dashboard.Target
+            Mode = dashboard.Mode
+            TypeId = dashboard.TypeId
+        |}
+    }
+
+    let private setClimateSetpoint: Action<_> = fun (input, output) config ctx -> asyncResult {
+        let! (request: Api.ClimateSetpoint) =
+            ctx
+            |> Api.ClimateSetpoint.parse
+            |> AsyncResult.mapError ApiError.Message
+
+        do! Api.ClimateFunction.setSetpoint (input, output) config.Eaton request.Room request.Temperature
+
+        return {| Status = "Ok" |}
+    }
+
     let private triggerMacro: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -294,6 +316,9 @@ module WebServer =
 
                     routef "/brightness/%s/%s"
                         (getDeviceBrightness >> handleJsonAction)
+
+                    routef "/climate/%s"
+                        (getClimateDashboard >> handleJsonAction)
                 ]
 
                 POST >=> choose [
@@ -305,6 +330,9 @@ module WebServer =
 
                     route "/triggerMacro"
                         >=> handleJsonAction triggerMacro
+
+                    route "/climate"
+                        >=> handleJsonAction setClimateSetpoint
                 ]
             ]
             |> app loggerFactory output port

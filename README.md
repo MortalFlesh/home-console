@@ -160,3 +160,45 @@ light:
           data:
             brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
 ```
+
+### Climate (floor heating)
+
+Each room controller generates three YAML blocks. `GET /climate/{zone}` returns the live temperature and setpoint; `POST /climate` accepts `{"room": "<zone>", "temperature": <value>}` and adjusts the Eaton setpoint in 0.5 °C steps.
+
+```yaml
+sensor:
+  - platform: rest
+    resource: http://192.168.1.10:28080/climate/hz_5
+    scan_interval: 60
+    name: eaton_climate_hdm_xComfort_Adapter_9214125
+    value_template: "{{ value_json.Temperature }}"
+    json_attributes:
+      - Temperature
+      - Setpoint
+
+rest_command:
+  eaton_climate_hdm_xComfort_Adapter_9214125_set_temp:
+    url: "http://192.168.1.10:28080/climate"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "temperature": {{ temperature }}}'
+
+climate:
+  - platform: template
+    climates:
+      eaton_climate_hdm_xComfort_Adapter_9214125:
+        friendly_name: "Living Room Thermostat"
+        current_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Temperature') | float(0) }}"
+        target_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Setpoint') | float(0) }}"
+        hvac_modes:
+          - heat
+        hvac_mode_template: "heat"
+        set_temperature:
+          action: rest_command.eaton_climate_hdm_xComfort_Adapter_9214125_set_temp
+          data:
+            temperature: "{{ temperature }}"
+        min_temp: 5
+        max_temp: 30
+        target_temp_step: 0.5
+```

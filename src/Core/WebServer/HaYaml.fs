@@ -176,3 +176,55 @@ module HaYaml =
                     ]
                 )
         ]
+
+    let climateLines currentHost (heatings: Device list) : string list =
+        heatings
+        |> List.choose (fun device ->
+            device.Zone
+            |> Option.map (fun zone ->
+                let zoneId = zone |> ZoneId.value
+                let id = device.DeviceId |> DeviceId.id
+                let name = device.DisplayName
+                let sensorName = $"eaton_climate_{id}"
+                let restCommandName = $"eaton_climate_{id}_set_temp"
+                let climateId = $"eaton_climate_{id}"
+                [
+                    "sensor:"
+                    "  - platform: rest"
+                    $"    resource: http://{currentHost}/climate/{zoneId}"
+                    "    scan_interval: 60"
+                    $"    name: {sensorName}"
+                    $"    value_template: \"{{{{ value_json.Temperature }}}}\""
+                    "    json_attributes:"
+                    "      - Temperature"
+                    "      - Setpoint"
+                    ""
+                    "rest_command:"
+                    $"  {restCommandName}:"
+                    $"    url: \"http://{currentHost}/climate\""
+                    "    method: POST"
+                    "    headers:"
+                    "      Content-Type: application/json"
+                    sprintf "    payload: '{\"room\": \"%s\", \"temperature\": {{ temperature }}}'" zoneId
+                    ""
+                    "climate:"
+                    "  - platform: template"
+                    "    climates:"
+                    $"      {climateId}:"
+                    $"        friendly_name: \"{name}\""
+                    $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Temperature') | float(0) }}}}\""
+                    $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Setpoint') | float(0) }}}}\""
+                    "        hvac_modes:"
+                    "          - heat"
+                    "        hvac_mode_template: \"heat\""
+                    "        set_temperature:"
+                    $"          action: rest_command.{restCommandName}"
+                    "          data:"
+                    "            temperature: \"{{ temperature }}\""
+                    "        min_temp: 5"
+                    "        max_temp: 30"
+                    "        target_temp_step: 0.5"
+                ]
+            )
+        )
+        |> List.collect id
