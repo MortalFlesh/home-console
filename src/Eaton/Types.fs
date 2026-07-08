@@ -297,6 +297,7 @@ module Device =
         match device.IdOverride with
         | Some id -> id
         | None -> device.DeviceId |> DeviceId.id
+        |> String.slugify
 
 [<RequireQualifiedAccess>]
 module DeviceStat =

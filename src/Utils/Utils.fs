@@ -84,6 +84,12 @@ module String =
     let startsWith (prefix: string) (string: string) =
         string.StartsWith(prefix)
 
+    let slugify (value: string) =
+        value.ToLower()
+        |> String.map (fun c ->
+            if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c = '_' then c else '_'
+        )
+
 [<RequireQualifiedAccess>]
 module Directory =
     open System.IO

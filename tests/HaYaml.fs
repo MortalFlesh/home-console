@@ -3,6 +3,7 @@ module HaYamlTests
 open Expecto
 open MF.Eaton
 open MF.HomeConsole.WebServer
+open MF.Utils
 
 let private makeDevice name deviceId deviceType children = {
     Name = name
@@ -40,19 +41,20 @@ let haYamlTests =
             let sensor = child "Living Room" "hdm:xComfort Adapter:1234_u0" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
             let lines = HaYaml.templateSensorLines [ device ]
-            let id = "hdm_xComfort_Adapter_1234_u0"
+            let slugId = "hdm_xcomfort_adapter_1234_u0"
+            let attrId = "hdm_xComfort_Adapter_1234_u0"
             Expect.equal lines [
                 ""
                 "template:"
                 "  - sensor:"
-                $"      - unique_id: {id}"
+                $"      - unique_id: {slugId}"
                 "        name: \"Living Room\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['value'] | float }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['value'] | float }}}}\""
                 "        unit_of_measurement: \"... add manually ...\""
                 "        device_class: value"
-                $"      - unique_id: {id}_last_update"
+                $"      - unique_id: {slugId}_last_update"
                 "        name: \"Living Room (last update)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['last_update'] }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['last_update'] }}}}\""
                 "        device_class: timestamp"
             ] "analog sensor lines"
         }
@@ -61,34 +63,35 @@ let haYamlTests =
             let sensor = child "Room Heating" "hdm:xComfort Adapter:5678_u0" (Actuator HeatingActuator)
             let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
             let lines = HaYaml.templateSensorLines [ device ]
-            let id = "hdm_xComfort_Adapter_5678_u0"
+            let slugId = "hdm_xcomfort_adapter_5678_u0"
+            let attrId = "hdm_xComfort_Adapter_5678_u0"
             Expect.equal lines [
                 ""
                 "template:"
                 "  - sensor:"
-                $"      - unique_id: {id}_temperature"
+                $"      - unique_id: {slugId}_temperature"
                 "        name: \"Room Heating (temperature)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['temperature'] | float }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['temperature'] | float }}}}\""
                 "        unit_of_measurement: \"°C\""
                 "        device_class: temperature"
-                $"      - unique_id: {id}_power_percentage"
+                $"      - unique_id: {slugId}_power_percentage"
                 "        name: \"Room Heating (power_percentage)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['power_percentage'] | float }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['power_percentage'] | float }}}}\""
                 "        unit_of_measurement: \"%\""
                 "        device_class: power_factor"
-                $"      - unique_id: {id}_power"
+                $"      - unique_id: {slugId}_power"
                 "        name: \"Room Heating (power)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['power'] | float }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['power'] | float }}}}\""
                 "        unit_of_measurement: \"W\""
                 "        device_class: power"
-                $"      - unique_id: {id}_overload"
+                $"      - unique_id: {slugId}_overload"
                 "        name: \"Room Heating (overload)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['overload'] | float }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['overload'] | float }}}}\""
                 "        unit_of_measurement: \"\""
                 "        device_class: value"
-                $"      - unique_id: {id}_last_update"
+                $"      - unique_id: {slugId}_last_update"
                 "        name: \"Room Heating (last update)\""
-                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['last_update'] }}}}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{attrId}')['last_update'] }}}}\""
                 "        device_class: timestamp"
             ] "heating actuator all metric lines"
         }
@@ -97,7 +100,7 @@ let haYamlTests =
             let sensor = child "Obývací pokoj" "hdm:xComfort Adapter:9999_u0" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
             let lines = HaYaml.templateSensorLines [ device ]
-            Expect.exists lines (fun l -> l.Contains "unique_id: hdm_xComfort_Adapter_9999_u0") "unique_id is device id"
+            Expect.exists lines (fun l -> l.Contains "unique_id: hdm_xcomfort_adapter_9999_u0") "unique_id is device id slug"
             Expect.exists lines (fun l -> l.Contains "name: \"Obývací pokoj\"") "display name unchanged"
         }
 
@@ -106,8 +109,8 @@ let haYamlTests =
             let s2 = child "Sensor B" "device_B" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ s1; s2 ]
             let lines = HaYaml.templateSensorLines [ device ]
-            Expect.exists lines (fun l -> l.Contains "unique_id: device_A") "sensor A present"
-            Expect.exists lines (fun l -> l.Contains "unique_id: device_B") "sensor B present"
+            Expect.exists lines (fun l -> l.Contains "unique_id: device_a") "sensor A present"
+            Expect.exists lines (fun l -> l.Contains "unique_id: device_b") "sensor B present"
         }
 
         test "id override changes unique_id but not state_attr attribute key" {
@@ -150,14 +153,14 @@ let climateLinesTests =
                 "  - platform: rest"
                 "    resource: http://192.168.1.10:28080/climate/hz_5"
                 "    scan_interval: 60"
-                "    name: eaton_climate_hdm_xComfort_Adapter_9214125"
+                "    name: eaton_climate_hdm_xcomfort_adapter_9214125"
                 "    value_template: \"{{ value_json.Temperature }}\""
                 "    json_attributes:"
                 "      - Temperature"
                 "      - Setpoint"
                 ""
                 "rest_command:"
-                "  eaton_climate_hdm_xComfort_Adapter_9214125_set_temp:"
+                "  eaton_climate_hdm_xcomfort_adapter_9214125_set_temp:"
                 "    url: \"http://192.168.1.10:28080/climate\""
                 "    method: POST"
                 "    headers:"
@@ -167,15 +170,15 @@ let climateLinesTests =
                 "climate:"
                 "  - platform: template"
                 "    climates:"
-                "      eaton_climate_hdm_xComfort_Adapter_9214125:"
+                "      eaton_climate_hdm_xcomfort_adapter_9214125:"
                 "        friendly_name: \"Living Room\""
-                "        current_temperature_template: \"{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Temperature') | float(0) }}\""
-                "        target_temperature_template: \"{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Setpoint') | float(0) }}\""
+                "        current_temperature_template: \"{{ state_attr('sensor.eaton_climate_hdm_xcomfort_adapter_9214125', 'Temperature') | float(0) }}\""
+                "        target_temperature_template: \"{{ state_attr('sensor.eaton_climate_hdm_xcomfort_adapter_9214125', 'Setpoint') | float(0) }}\""
                 "        hvac_modes:"
                 "          - heat"
                 "        hvac_mode_template: \"heat\""
                 "        set_temperature:"
-                "          action: rest_command.eaton_climate_hdm_xComfort_Adapter_9214125_set_temp"
+                "          action: rest_command.eaton_climate_hdm_xcomfort_adapter_9214125_set_temp"
                 "          data:"
                 "            temperature: \"{{ temperature }}\""
                 "        min_temp: 5"
@@ -203,19 +206,26 @@ let lightLinesTests =
             let lines = HaYaml.lightLines "host" []
             Expect.equal (lines |> List.head) "sensor:" "starts with sensor block"
             Expect.exists lines (fun l -> l.Contains "name: eaton_brightness") "brightness sensor present"
+            Expect.exists lines (fun l -> l = "template:") "template header present"
+            Expect.exists lines (fun l -> l = "  - light:") "light header present"
         }
 
         test "dimmer child generates rest_command, light template and brightness attribute" {
             let dimmerChild = child "Kitchen Light" "hdm:xComfort Adapter:4110125_u0" (Actuator DimmerActuator) |> inZone "hz_3"
             let dimmer = makeDevice "Kitchen" "parent" (Actuator DimmerActuator) [ dimmerChild ]
             let lines = HaYaml.lightLines "host" [ dimmer ]
-            let id = "hdm_xComfort_Adapter_4110125_u0"
+            let slugId = "hdm_xcomfort_adapter_4110125_u0"
+            let attrId = "hdm_xComfort_Adapter_4110125_u0"
 
-            Expect.exists lines (fun l -> l.Contains (sprintf "      - %s" id)) "brightness attribute present"
-            Expect.exists lines (fun l -> l.Contains (sprintf "  eaton_%s_set_level:" id)) "rest_command present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "      - %s" attrId)) "brightness attribute present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "  eaton_%s_set_level:" slugId)) "rest_command present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_3\", \"device\": \"xCo:4110125_u0\", \"density\": {{ brightness_pct }}}'") "payload uses short device id and room"
-            Expect.exists lines (fun l -> l.Contains (sprintf "      eaton_light_%s:" id)) "light template present"
-            Expect.exists lines (fun l -> l.Contains "friendly_name: \"Kitchen Light\"") "friendly name present"
+            Expect.exists lines (fun l -> l.Contains "name: \"Kitchen Light\"") "name present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "default_entity_id: light.eaton_light_%s" slugId)) "default_entity_id present"
+            Expect.exists lines (fun l -> l.Contains "        level: >-") "level key present"
+            Expect.exists lines (fun l -> l.Contains "        state:") "state key present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "          - action: rest_command.eaton_%s_set_level" slugId)) "action wired as list"
+            Expect.isFalse (lines |> List.exists (fun l -> l.Contains (sprintf "eaton_light_%s:" slugId))) "no legacy object-key form"
         }
     ]
 
@@ -223,22 +233,40 @@ let lightLinesTests =
 let coverLinesTests =
     testList "HaYaml.coverLines" [
 
-        test "empty covers list emits rest_command and cover headers only" {
+        test "empty covers list emits rest_command and template cover headers only" {
             let lines = HaYaml.coverLines "host" []
-            Expect.equal lines [ "rest_command:"; ""; "cover:"; "  - platform: template"; "    covers:" ] "headers only"
+            Expect.equal lines [ "rest_command:"; ""; "template:"; "  - cover:" ] "headers only"
         }
 
         test "shutter child generates open, close and stop rest_commands and a cover template" {
             let shutterChild = child "Kitchen Blind" "hdm:xComfort Adapter:111_u0" (Actuator ShutterActuator) |> inZone "hz_1"
             let shutter = makeDevice "Kitchen" "parent" (Actuator ShutterActuator) [ shutterChild ]
             let lines = HaYaml.coverLines "host" [ shutter ]
-            let id = "hdm_xComfort_Adapter_111_u0"
+            let slugId = "hdm_xcomfort_adapter_111_u0"
 
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"open\"}'") "open payload present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"close\"}'") "close payload present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"stop\"}'") "stop payload present"
-            Expect.exists lines (fun l -> l.Contains (sprintf "      eaton_cover_%s:" id)) "cover template present"
-            Expect.exists lines (fun l -> l.Contains (sprintf "          action: rest_command.eaton_%s_open" id)) "open action wired"
+            Expect.exists lines (fun l -> l.Contains "name: \"Kitchen Blind\"") "name present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "default_entity_id: cover.eaton_cover_%s" slugId)) "default_entity_id present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "          - action: rest_command.eaton_%s_open" slugId)) "open action wired as list"
+            Expect.isFalse (lines |> List.exists (fun l -> l.Contains (sprintf "eaton_cover_%s:" slugId))) "no legacy object-key form"
         }
     ]
 
+[<Tests>]
+let slugifyTests =
+    testList "String.slugify" [
+
+        test "lowercases and replaces non-slug characters with underscores" {
+            Expect.equal (String.slugify "hdm_xComfort_Adapter_9367063_u0") "hdm_xcomfort_adapter_9367063_u0" "mixed-case device id"
+        }
+
+        test "replaces colons and spaces" {
+            Expect.equal (String.slugify "hdm:xComfort Adapter:1234") "hdm_xcomfort_adapter_1234" "colon and space input"
+        }
+
+        test "is idempotent on valid slugs" {
+            Expect.equal (String.slugify "my_living_room") "my_living_room" "already valid slug unchanged"
+        }
+    ]

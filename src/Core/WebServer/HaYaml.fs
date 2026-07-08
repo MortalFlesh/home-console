@@ -34,22 +34,21 @@ module HaYaml =
             yield! coverChildren |> List.collect restCommandEntries
 
             ""
-            "cover:"
-            "  - platform: template"
-            "    covers:"
+            "template:"
+            "  - cover:"
             yield!
                 coverChildren
                 |> List.collect (fun device ->
                     let id = coverId device
                     [
-                        $"      eaton_cover_{id}:"
-                        $"        friendly_name: \"{Device.effectiveName device}\""
+                        $"      - name: \"{Device.effectiveName device}\""
+                        $"        default_entity_id: cover.eaton_cover_{id}"
                         "        open_cover:"
-                        $"          action: rest_command.eaton_{id}_open"
+                        $"          - action: rest_command.eaton_{id}_open"
                         "        close_cover:"
-                        $"          action: rest_command.eaton_{id}_close"
+                        $"          - action: rest_command.eaton_{id}_close"
                         "        stop_cover:"
-                        $"          action: rest_command.eaton_{id}_stop"
+                        $"          - action: rest_command.eaton_{id}_stop"
                     ]
                 )
         ]
@@ -163,32 +162,31 @@ module HaYaml =
                 )
 
             ""
-            "light:"
-            "  - platform: template"
-            "    lights:"
+            "template:"
+            "  - light:"
             yield!
                 dimmerChildren
                 |> List.collect (fun device ->
                     let id = dimmerId device
                     let attrId = dimmerAttrId device
                     [
-                        $"      eaton_light_{id}:"
-                        $"        friendly_name: \"{Device.effectiveName device}\""
-                        $"        level_template: >-"
+                        $"      - name: \"{Device.effectiveName device}\""
+                        $"        default_entity_id: light.eaton_light_{id}"
+                        "        level: >-"
                         $"          {{{{ (state_attr('sensor.eaton_brightness', '{attrId}') | int(0)) * 255 / 100 }}}}"
-                        $"        value_template: \"{{{{ (state_attr('sensor.eaton_brightness', '{attrId}') | int(0)) > 0 }}}}\""
+                        $"        state: \"{{{{ (state_attr('sensor.eaton_brightness', '{attrId}') | int(0)) > 0 }}}}\""
                         "        turn_on:"
-                        $"          action: rest_command.eaton_{id}_set_level"
-                        "          data:"
-                        "            brightness_pct: 100"
+                        $"          - action: rest_command.eaton_{id}_set_level"
+                        "            data:"
+                        "              brightness_pct: 100"
                         "        turn_off:"
-                        $"          action: rest_command.eaton_{id}_set_level"
-                        "          data:"
-                        "            brightness_pct: 0"
+                        $"          - action: rest_command.eaton_{id}_set_level"
+                        "            data:"
+                        "              brightness_pct: 0"
                         "        set_level:"
-                        $"          action: rest_command.eaton_{id}_set_level"
-                        "          data:"
-                        "            brightness_pct: \"{{ (brightness / 255 * 100) | round(0) }}\""
+                        $"          - action: rest_command.eaton_{id}_set_level"
+                        "            data:"
+                        "              brightness_pct: \"{{ (brightness / 255 * 100) | round(0) }}\""
                     ]
                 )
         ]
