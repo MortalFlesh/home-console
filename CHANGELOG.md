@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.19.1 - 2026-07-08
 - Add `String.slugify` helper: lowercases and replaces any character outside `[a-z0-9_]` with `_`
 - Apply `String.slugify` in `Device.effectiveId` so all generated HA YAML keys (`rest_command`, `light`, `cover`, `climate`, template-sensor `unique_id`) are valid HA slugs — eliminates `invalid slug` warnings in HA
 - `state_attr(...)` lookups and `json_attributes:` entries are unchanged (still mixed-case `DeviceId.id`), so attribute resolution keeps working
