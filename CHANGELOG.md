@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.18.1 - 2026-07-08
 - Fix unset option
 
 ## 1.18.0 - 2026-07-08
