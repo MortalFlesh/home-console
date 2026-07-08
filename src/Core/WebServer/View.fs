@@ -111,7 +111,7 @@ tailwind.config = { darkMode: 'class' };
         let private coversRow currentHost (covers: Device list) =
             div [ _id "covers"; _class "mb-8" ] [
                 h3 [ _class "text-xl font-semibold mb-2 text-gray-800 dark:text-gray-100" ] [ str "Covers (shutters, blinds, awnings)" ]
-                p [ _class "mb-2 text-gray-600 dark:text-gray-400" ] [ str "Add rest_command entries to your rest_command: section, and the cover: block separately." ]
+                p [ _class "mb-2 text-gray-600 dark:text-gray-400" ] [ str "Add rest_command entries to your rest_command: section. Merge the template: block below with any other template: blocks (sensors, lights) into a single top-level template: list." ]
                 HaYaml.coverLines currentHost covers
                 |> htmlYaml
             ]
@@ -119,7 +119,7 @@ tailwind.config = { darkMode: 'class' };
         let private lightsRow currentHost (dimmers: Device list) =
             div [ _id "lights"; _class "mb-8" ] [
                 h3 [ _class "text-xl font-semibold mb-2 text-gray-800 dark:text-gray-100" ] [ str "Lights (dimmers)" ]
-                p [ _class "mb-2 text-gray-600 dark:text-gray-400" ] [ str "Add the sensor: block, then rest_command entries to your rest_command: section, and the light: block separately." ]
+                p [ _class "mb-2 text-gray-600 dark:text-gray-400" ] [ str "Add the sensor: block, then rest_command entries to your rest_command: section. Merge the template: block below with any other template: blocks (sensors, covers) into a single top-level template: list." ]
                 HaYaml.lightLines currentHost dimmers
                 |> htmlYaml
             ]

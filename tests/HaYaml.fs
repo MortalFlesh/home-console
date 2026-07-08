@@ -203,6 +203,8 @@ let lightLinesTests =
             let lines = HaYaml.lightLines "host" []
             Expect.equal (lines |> List.head) "sensor:" "starts with sensor block"
             Expect.exists lines (fun l -> l.Contains "name: eaton_brightness") "brightness sensor present"
+            Expect.exists lines (fun l -> l = "template:") "template header present"
+            Expect.exists lines (fun l -> l = "  - light:") "light header present"
         }
 
         test "dimmer child generates rest_command, light template and brightness attribute" {
@@ -214,8 +216,12 @@ let lightLinesTests =
             Expect.exists lines (fun l -> l.Contains (sprintf "      - %s" id)) "brightness attribute present"
             Expect.exists lines (fun l -> l.Contains (sprintf "  eaton_%s_set_level:" id)) "rest_command present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_3\", \"device\": \"xCo:4110125_u0\", \"density\": {{ brightness_pct }}}'") "payload uses short device id and room"
-            Expect.exists lines (fun l -> l.Contains (sprintf "      eaton_light_%s:" id)) "light template present"
-            Expect.exists lines (fun l -> l.Contains "friendly_name: \"Kitchen Light\"") "friendly name present"
+            Expect.exists lines (fun l -> l.Contains "name: \"Kitchen Light\"") "name present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "default_entity_id: light.eaton_light_%s" id)) "default_entity_id present"
+            Expect.exists lines (fun l -> l.Contains "        level: >-") "level key present"
+            Expect.exists lines (fun l -> l.Contains "        state:") "state key present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "          - action: rest_command.eaton_%s_set_level" id)) "action wired as list"
+            Expect.isFalse (lines |> List.exists (fun l -> l.Contains (sprintf "eaton_light_%s:" id))) "no legacy object-key form"
         }
     ]
 
@@ -223,9 +229,9 @@ let lightLinesTests =
 let coverLinesTests =
     testList "HaYaml.coverLines" [
 
-        test "empty covers list emits rest_command and cover headers only" {
+        test "empty covers list emits rest_command and template cover headers only" {
             let lines = HaYaml.coverLines "host" []
-            Expect.equal lines [ "rest_command:"; ""; "cover:"; "  - platform: template"; "    covers:" ] "headers only"
+            Expect.equal lines [ "rest_command:"; ""; "template:"; "  - cover:" ] "headers only"
         }
 
         test "shutter child generates open, close and stop rest_commands and a cover template" {
@@ -237,8 +243,10 @@ let coverLinesTests =
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"open\"}'") "open payload present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"close\"}'") "close payload present"
             Expect.exists lines (fun l -> l.Contains "payload: '{\"room\": \"hz_1\", \"device\": \"xCo:111_u0\", \"state\": \"stop\"}'") "stop payload present"
-            Expect.exists lines (fun l -> l.Contains (sprintf "      eaton_cover_%s:" id)) "cover template present"
-            Expect.exists lines (fun l -> l.Contains (sprintf "          action: rest_command.eaton_%s_open" id)) "open action wired"
+            Expect.exists lines (fun l -> l.Contains "name: \"Kitchen Blind\"") "name present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "default_entity_id: cover.eaton_cover_%s" id)) "default_entity_id present"
+            Expect.exists lines (fun l -> l.Contains (sprintf "          - action: rest_command.eaton_%s_open" id)) "open action wired as list"
+            Expect.isFalse (lines |> List.exists (fun l -> l.Contains (sprintf "eaton_cover_%s:" id))) "no legacy object-key form"
         }
     ]
 
