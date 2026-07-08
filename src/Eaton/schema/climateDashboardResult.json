@@ -1,0 +1,14 @@
+{
+    "mode": "User",
+    "auto": false,
+    "setpoint": "21.4",
+    "offset": "-1.1",
+    "waitForTemperature": true,
+    "temperatureUnit": "°C",
+    "openDoors": "0",
+    "temperature": "27.6",
+    "active": false,
+    "typeId": "heating",
+    "type": "Heating",
+    "openWindows": "0"
+}

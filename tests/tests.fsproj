@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <Compile Include="HaYaml.fs" />
+    <Compile Include="Settings.fs" />
     <Compile Include="Tests.fs" />
   </ItemGroup>
 

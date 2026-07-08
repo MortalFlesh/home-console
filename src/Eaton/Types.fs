@@ -83,6 +83,8 @@ type Device = {
     Children: Device list
 
     Zone: ZoneId option
+
+    IdOverride: string option
 }
 
 and [<RequireQualifiedAccess>] Rssi =
@@ -234,8 +236,8 @@ module DeviceType =
 
         | Some (String.Contains "Actuator" as deviceType) ->
             match deviceType with
-            | String.Contains "Dimmer" -> Actuator DimmerActuator
-            | String.Contains "Shutter" -> Actuator ShutterActuator
+            | String.Contains "Dimmer" | String.Contains "Dimming" -> Actuator DimmerActuator
+            | String.Contains "Shutter" | String.Contains "Shading" -> Actuator ShutterActuator
             | String.Contains "Switch" -> Actuator SwitchActuator
             | String.Contains "Heating" -> Actuator HeatingActuator
             | other -> Other (Some other)
@@ -268,11 +270,33 @@ module Device =
         | { Type = Sensor _ } -> true
         | _ -> false
 
+    let isCover = function
+        | { Type = Actuator ShutterActuator } -> true
+        | _ -> false
+
+    let isDimmer = function
+        | { Type = Actuator DimmerActuator } -> true
+        | _ -> false
+
+    let isHeating = function
+        | { Type = Thermostat ThermostatSubType.RoomController } -> true
+        | _ -> false
+
     let isSwitch = function
         | { Type = Actuator HeatingActuator } -> false
+        | { Type = Actuator ShutterActuator } -> false
+        | { Type = Actuator DimmerActuator } -> false
         | { Type = Actuator _ }
         | { Type = PushButton }  -> true
         | _ -> false
+
+    let effectiveName (device: Device) =
+        if device.DisplayName <> "" then device.DisplayName else device.Name
+
+    let effectiveId (device: Device) : string =
+        match device.IdOverride with
+        | Some id -> id
+        | None -> device.DeviceId |> DeviceId.id
 
 [<RequireQualifiedAccess>]
 module DeviceStat =

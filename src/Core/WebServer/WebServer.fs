@@ -12,6 +12,8 @@ module WebServer =
     open Giraffe
     open Saturn
 
+    open System
+
     open Feather.ConsoleApplication
     open MF.Utils
     open Feather.ErrorHandling
@@ -48,6 +50,8 @@ module WebServer =
                 .AddGiraffe()
         )
     }
+
+    let mutable settingsCache: Settings = Settings.empty
 
     let mutable zonesCache: (Zone list) option = None
     let private loadZones (input, output) config = asyncResult {
@@ -106,9 +110,11 @@ module WebServer =
         let! (scenes: Scene list) = loadScenes (input, output) config
         let host = ctx.Request.Host.Host
 
+        let effectiveDevices = Settings.applyToDevices settingsCache devices
+
         return View.Html.index {
             CurrentHost = $"{host}:{port}"
-            Devices = devices
+            Devices = effectiveDevices
             Scenes = scenes
         }
     }
@@ -145,12 +151,12 @@ module WebServer =
                                 "power", heating.Power |> sprintf "%.1f"
                                 "overload", heating.Overload.ToString()
 
-                                "last_update", lastUpdate.ToString("HH:mm:ss")
+                                "last_update", lastUpdate.ToString("o")
                             | _ ->
                             match stat device.DeviceId with
                             | Some value ->
                                 device.Type |> DeviceType.valueType, value.EventLog |> DeviceStat.value
-                                "last_update", value.LastMsgTimeStamp.ToString()
+                                "last_update", (DateTimeOffset.Now - value.LastMsgTimeStamp).ToString("o")
                             | _ -> ()
                         ]
                     )
@@ -182,6 +188,37 @@ module WebServer =
         |}
     }
 
+    let private brightnessStats: Action<_> = fun (input, output) config _ -> asyncResult {
+        let! (devices: Device list) = loadDevices (input, output) config
+        let lastUpdated, values = Api.DeviceStates.allValueStates ()
+
+        // the value cache is keyed by the state-response id (xCo:... form); map it back to the
+        // device-list id (hdm:... form) so /brightness keys match /sensors and the light template
+        let idMap =
+            devices
+            |> List.collect (fun device -> device.Children)
+            |> List.map (fun device -> DeviceId (device.DeviceId |> DeviceId.shortId |> ShortDeviceId.value), device.DeviceId |> DeviceId.id)
+            |> Map.ofList
+
+        return {|
+            Updated = lastUpdated
+            Brightness =
+                values
+                |> List.choose (fun (_, device, v) -> idMap |> Map.tryFind device |> Option.map (fun haId -> haId, v))
+                |> Map.ofList
+        |}
+    }
+
+    let private getDeviceBrightness (zone, device): Action<_> = fun _ _ _ -> asyncResult {
+        let brightness =
+            (ZoneId zone, DeviceId device)
+            |> Api.DeviceStates.loadValueState
+            |> snd
+            |> Option.defaultValue 0
+
+        return {| Brightness = brightness |}
+    }
+
     let private changeDeviceState: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -208,6 +245,43 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
+    let private getClimateDashboard (zone: string) : Action<_> = fun (input, output) config _ -> asyncResult {
+        let! (dashboard: Api.ClimateFunction.ClimateDashboard) = Api.ClimateFunction.getDashboard (input, output) config.Eaton (ZoneId zone)
+
+        return {|
+            Temperature = dashboard.Current
+            Setpoint = dashboard.Target
+            Mode = dashboard.Mode
+            TypeId = dashboard.TypeId
+        |}
+    }
+
+    let private setClimateSetpoint: Action<_> = fun (input, output) config ctx -> asyncResult {
+        let! (request: Api.ClimateSetpoint) =
+            ctx
+            |> Api.ClimateSetpoint.parse
+            |> AsyncResult.mapError ApiError.Message
+
+        do! Api.ClimateFunction.setSetpoint (input, output) config.Eaton request.Room request.Temperature
+
+        return {| Status = "Ok" |}
+    }
+
+    let private version =
+        System.Reflection.Assembly.GetEntryAssembly()
+        |> Option.ofObj
+        |> Option.map (fun a -> a.GetName().Version |> string)
+        |> Option.defaultValue "unknown"
+
+    let private health: Action<_> = fun _ _ _ -> asyncResult {
+        let status = if zonesCache.IsSome then "ok" else "degraded"
+        return {|
+            Status = status
+            LastUpdated = Api.DeviceStates.lastUpdated
+            Version = version
+        |}
+    }
+
     let private triggerMacro: Action<_> = fun (input, output) config ctx -> asyncResult {
         let! request =
             ctx
@@ -217,6 +291,35 @@ module WebServer =
         do!
             request
             |> Api.triggerMacro (input, output) config.Eaton
+
+        return {| Status = "Ok" |}
+    }
+
+    let private getConfig: Action<_> = fun (input, output) config _ctx -> asyncResult {
+        let! (devices: Device list) = loadDevices (input, output) config
+        return View.Html.configPage {
+            Devices = devices
+            Settings = settingsCache
+        }
+    }
+
+    let private postConfig: Action<_> = fun _ config ctx -> asyncResult {
+        use reader = new System.IO.StreamReader(ctx.Request.Body)
+        let! body =
+            reader.ReadToEndAsync()
+            |> AsyncResult.ofTaskCatch ApiError.Exception
+
+        let! settings =
+            body
+            |> Settings.tryParse
+            |> Result.mapError ApiError.Message
+
+        settingsCache <- settings
+        let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+        do!
+            Settings.serialize settings
+            |> Store.saveText settingsPath
+            |> Async.map (Result.mapError ApiError.Exception)
 
         return {| Status = "Ok" |}
     }
@@ -237,16 +340,64 @@ module WebServer =
         | Error error -> return! (json error >=> setStatusCode 400) next ctx
     }
 
+    let private startWithRetry (input, output) config = async {
+        let backoffMs = [| 5_000; 10_000; 20_000; 40_000; 60_000 |]
+        let mutable attempt = 0
+        let mutable loaded = false
+        while not loaded do
+            match! loadZones (input, output) config with
+            | Ok zones ->
+                let existingZoneIds =
+                    settingsCache.Zones
+                    |> List.choose (fun z -> if z.DisplayName.IsSome then Some z.ZoneId else None)
+                    |> Set.ofList
+
+                let newZones =
+                    zones
+                    |> List.choose (fun zone ->
+                        let zoneId = zone.Id |> ZoneId.value
+                        if existingZoneIds |> Set.contains zoneId then None
+                        else Some { ZoneId = zoneId; DisplayName = Some zone.Name }
+                    )
+
+                if newZones |> List.isEmpty |> not then
+                    let merged =
+                        let toAdd = newZones |> List.map (fun z -> z.ZoneId, z) |> Map.ofList
+                        let updated = settingsCache.Zones |> List.map (fun z -> { z with DisplayName = z.DisplayName |> Option.orElse (toAdd |> Map.tryFind z.ZoneId |> Option.bind (fun s -> s.DisplayName)) })
+                        let existingIds = settingsCache.Zones |> List.map (fun z -> z.ZoneId) |> Set.ofList
+                        let added = newZones |> List.filter (fun z -> existingIds |> Set.contains z.ZoneId |> not)
+                        updated @ added
+
+                    settingsCache <- { settingsCache with Zones = merged }
+
+                    let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+                    match! Settings.serialize settingsCache |> Store.saveText settingsPath with
+                    | Ok () -> output.Message "[Settings] Pre-seeded zone names from Eaton"
+                    | Error _ -> ()
+
+                zones
+                |> List.map (fun zone -> zone.Id)
+                |> Api.DeviceStates.startLoadingState (input, output) config.Eaton
+                |> Async.Start
+                loaded <- true
+            | Error err ->
+                let delay = backoffMs[min attempt (backoffMs.Length - 1)]
+                output.Warning(sprintf "Eaton not reachable (attempt %d), retrying in %d s: %A" (attempt + 1) (delay / 1000) err)
+                do! Async.Sleep delay
+                attempt <- attempt + 1
+    }
+
     let run loggerFactory (input, output) (config: Config) port: AsyncResult<unit, ApiError> = asyncResult {
         let handleJsonAction action = handleJsonAction (input, output) config action
         let handleHtmlAction action = handleHtmlAction (input, output) config action
 
-        let! (zones: Zone list) = loadZones (input, output) config
+        let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+        settingsCache <-
+            Store.tryLoadText settingsPath
+            |> Option.map Settings.parse
+            |> Option.defaultValue Settings.empty
 
-        zones
-        |> List.map (fun zone -> zone.Id)
-        |> Api.DeviceStates.startLoadingState (input, output) config.Eaton
-        |> Async.Start
+        startWithRetry (input, output) config |> Async.Start
 
         return
             [
@@ -266,6 +417,21 @@ module WebServer =
 
                     route "/states"
                         >=> handleJsonAction getAllDevicesStates
+
+                    route "/brightness"
+                        >=> handleJsonAction brightnessStats
+
+                    routef "/brightness/%s/%s"
+                        (getDeviceBrightness >> handleJsonAction)
+
+                    routef "/climate/%s"
+                        (getClimateDashboard >> handleJsonAction)
+
+                    route "/health"
+                        >=> handleJsonAction health
+
+                    route "/config"
+                        >=> handleHtmlAction getConfig
                 ]
 
                 POST >=> choose [
@@ -277,6 +443,12 @@ module WebServer =
 
                     route "/triggerMacro"
                         >=> handleJsonAction triggerMacro
+
+                    route "/climate"
+                        >=> handleJsonAction setClimateSetpoint
+
+                    route "/config"
+                        >=> handleJsonAction postConfig
                 ]
             ]
             |> app loggerFactory output port
