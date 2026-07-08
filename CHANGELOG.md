@@ -2,9 +2,13 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Add `String.slugify` helper: lowercases and replaces any character outside `[a-z0-9_]` with `_`
+- Apply `String.slugify` in `Device.effectiveId` so all generated HA YAML keys (`rest_command`, `light`, `cover`, `climate`, template-sensor `unique_id`) are valid HA slugs — eliminates `invalid slug` warnings in HA
+- `state_attr(...)` lookups and `json_attributes:` entries are unchanged (still mixed-case `DeviceId.id`), so attribute resolution keeps working
 - Migrate generated cover and light YAML from deprecated `platform: template` blocks to modern `template: - cover:` / `template: - light:` format with `default_entity_id`, `name`, and list-form actions — eliminates HA 2026.6 "Zastaralá šablona" deprecation warnings while preserving existing entity IDs
 - Add UI note on covers and lights sections: all `template:` snippets must be merged under a single top-level `template:` list in `configuration.yaml`
 
+## 1.19.0 - 2026-07-08
 - Convert Entity Settings from a separate `/config` page to an inline modal on the index page — fixes opening settings via HA Ingress iframe (no navigation required, no absolute-URL 404)
 - Replace `⚙ Entity Settings` link with a button that opens the modal (`openSettings()` / `closeSettings()` / backdrop click / `Esc`)
 - Extract `settingsFormBody` shared helper to render the settings form on both the modal and the standalone `/config` fallback page
