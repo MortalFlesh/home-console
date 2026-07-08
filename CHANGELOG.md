@@ -2,6 +2,13 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Sort entity settings table by zone then Eaton name (U1)
+- Add zone naming: local display labels for zone ids, persisted in `settings.json` under `Zones` (U2)
+- Add entity id override: per-entity slug/`unique_id` override in the config page, applied to generated YAML entity names while keeping `state_attr` attribute keys unchanged (U3)
+- Add `Device.effectiveId` helper: returns `IdOverride` when set, falls back to `DeviceId.id` (U3)
+- Add table of contents on the index page with anchors for each non-empty section (U4)
+- Replace Bootstrap 4 with Tailwind CSS (Play CDN); add dark/light theme toggle persisted in `localStorage` (U5)
+- Add YAML syntax highlighting with Prism.js (language-yaml + line-numbers plugin); theme follows dark/light toggle (U6)
 - Use net10.0
 - Generate Yaml template for HA in up-to-date format
 - Add cover as a specific type

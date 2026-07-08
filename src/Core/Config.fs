@@ -15,10 +15,17 @@ type EntitySetting = {
     DeviceId: string
     Visible: bool
     DisplayName: string option
+    IdOverride: string option
+}
+
+type ZoneSetting = {
+    ZoneId: string
+    DisplayName: string option
 }
 
 type Settings = {
     Entities: EntitySetting list
+    Zones: ZoneSetting list
 }
 
 [<RequireQualifiedAccess>]
@@ -27,7 +34,7 @@ module Settings =
 
     type private SettingsSchema = JsonProvider<"schema/settings.json">
 
-    let empty : Settings = { Entities = [] }
+    let empty : Settings = { Entities = []; Zones = [] }
 
     let tryParse (json: string) : Result<Settings, string> =
         try
@@ -39,8 +46,18 @@ module Settings =
                         DeviceId = e.DeviceId
                         Visible = e.Visible
                         DisplayName = e.DisplayName
+                        IdOverride = e.IdOverride
                     })
                     |> List.ofArray
+                Zones =
+                    try
+                        parsed.Zones
+                        |> Array.map (fun z -> {
+                            ZoneId = z.ZoneId
+                            DisplayName = z.DisplayName
+                        })
+                        |> List.ofArray
+                    with _ -> []
             }
         with e -> Error e.Message
 
@@ -57,11 +74,27 @@ module Settings =
                 match e.DisplayName with
                 | Some name -> yield "DisplayName", JsonValue.String name
                 | None -> ()
+                match e.IdOverride with
+                | Some id -> yield "IdOverride", JsonValue.String id
+                | None -> ()
             ]
             |> Array.ofList
             |> JsonValue.Record
 
-        JsonValue.Record [| "Entities", settings.Entities |> List.map entity |> Array.ofList |> JsonValue.Array |]
+        let zone (z: ZoneSetting) =
+            [
+                yield "ZoneId", JsonValue.String z.ZoneId
+                match z.DisplayName with
+                | Some name -> yield "DisplayName", JsonValue.String name
+                | None -> ()
+            ]
+            |> Array.ofList
+            |> JsonValue.Record
+
+        JsonValue.Record [|
+            "Entities", settings.Entities |> List.map entity |> Array.ofList |> JsonValue.Array
+            "Zones", settings.Zones |> List.map zone |> Array.ofList |> JsonValue.Array
+        |]
         |> fun json -> json.ToString()
 
     let applyToDevices (settings: Settings) (devices: Device list) : Device list =
@@ -70,14 +103,13 @@ module Settings =
             |> List.map (fun e -> e.DeviceId, e)
             |> Map.ofList
 
-        let applyDisplayName (device: Device) =
+        let applySettings (device: Device) =
             let id = device.DeviceId |> DeviceId.id
-            let displayName =
-                settingsMap
-                |> Map.tryFind id
-                |> Option.bind (fun e -> e.DisplayName)
-                |> Option.defaultValue device.DisplayName
-            { device with DisplayName = displayName }
+            match settingsMap |> Map.tryFind id with
+            | None -> device
+            | Some e ->
+                let displayName = e.DisplayName |> Option.defaultValue device.DisplayName
+                { device with DisplayName = displayName; IdOverride = e.IdOverride }
 
         let isEntityVisible id =
             settingsMap
@@ -93,11 +125,16 @@ module Settings =
                 let children =
                     device.Children
                     |> List.filter (fun child -> child.DeviceId |> DeviceId.id |> isEntityVisible)
-                    |> List.map applyDisplayName
+                    |> List.map applySettings
 
                 if device.Children |> List.isEmpty |> not && children |> List.isEmpty then None
-                else Some { (applyDisplayName device) with Children = children }
+                else Some { (applySettings device) with Children = children }
         )
+
+    let zoneDisplayName (settings: Settings) (zoneId: string) : string option =
+        settings.Zones
+        |> List.tryFind (fun z -> z.ZoneId = zoneId)
+        |> Option.bind (fun z -> z.DisplayName)
 
 [<RequireQualifiedAccess>]
 module Config =

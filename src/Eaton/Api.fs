@@ -433,6 +433,8 @@ module Api =
                         Children = []
 
                         Zone = zoneMap |> Map.tryFind deviceId
+
+                        IdOverride = None
                     }
                 )
 
@@ -468,6 +470,8 @@ module Api =
                         Children = []
 
                         Zone = zoneMap |> Map.tryFind deviceId
+
+                        IdOverride = None
                     }
                 )
                 |> List.groupBy (fun device -> device.Parent <?=> device.DeviceId)

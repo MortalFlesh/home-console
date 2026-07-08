@@ -347,6 +347,34 @@ module WebServer =
         while not loaded do
             match! loadZones (input, output) config with
             | Ok zones ->
+                let existingZoneIds =
+                    settingsCache.Zones
+                    |> List.choose (fun z -> if z.DisplayName.IsSome then Some z.ZoneId else None)
+                    |> Set.ofList
+
+                let newZones =
+                    zones
+                    |> List.choose (fun zone ->
+                        let zoneId = zone.Id |> ZoneId.value
+                        if existingZoneIds |> Set.contains zoneId then None
+                        else Some { ZoneId = zoneId; DisplayName = Some zone.Name }
+                    )
+
+                if newZones |> List.isEmpty |> not then
+                    let merged =
+                        let toAdd = newZones |> List.map (fun z -> z.ZoneId, z) |> Map.ofList
+                        let updated = settingsCache.Zones |> List.map (fun z -> { z with DisplayName = z.DisplayName |> Option.orElse (toAdd |> Map.tryFind z.ZoneId |> Option.bind (fun s -> s.DisplayName)) })
+                        let existingIds = settingsCache.Zones |> List.map (fun z -> z.ZoneId) |> Set.ofList
+                        let added = newZones |> List.filter (fun z -> existingIds |> Set.contains z.ZoneId |> not)
+                        updated @ added
+
+                    settingsCache <- { settingsCache with Zones = merged }
+
+                    let settingsPath = System.IO.Path.Combine(config.Data.Directory, "settings.json")
+                    match! Settings.serialize settingsCache |> Store.saveText settingsPath with
+                    | Ok () -> output.Message "[Settings] Pre-seeded zone names from Eaton"
+                    | Error _ -> ()
+
                 zones
                 |> List.map (fun zone -> zone.Id)
                 |> Api.DeviceStates.startLoadingState (input, output) config.Eaton

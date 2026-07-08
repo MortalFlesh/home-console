@@ -9,7 +9,7 @@ module HaYaml =
 
     let coverLines currentHost (covers: Device list) : string list =
         let coverId (device: Device) =
-            device.DeviceId |> DeviceId.id
+            Device.effectiveId device
 
         let restCommandEntries (device: Device) =
             let room = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "unknown"
@@ -66,7 +66,7 @@ module HaYaml =
                 |> List.collect (fun sensor ->
                     sensor.Children
                     |> List.collect (fun sensor ->
-                        let name = sensor.Name |> Name.asUniqueKey
+                        let uniqueId = Device.effectiveId sensor
                         let deviceId = sensor.DeviceId |> DeviceId.id
 
                         match sensor.Type with
@@ -83,7 +83,7 @@ module HaYaml =
                                     let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId metric
 
                                     [
-                                        $"      - unique_id: {name}_{metric}"
+                                        $"      - unique_id: {uniqueId}_{metric}"
                                         $"        name: \"{Device.effectiveName sensor} ({metric})\""
                                         $"        state: \"{valueTemplate}\""
                                         $"        unit_of_measurement: \"{heating.Unit}\""
@@ -92,7 +92,7 @@ module HaYaml =
                                 )
                             )
                             @ [
-                                $"      - unique_id: {name}_last_update"
+                                $"      - unique_id: {uniqueId}_last_update"
                                 $"        name: \"{Device.effectiveName sensor} (last update)\""
                                 $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
                                 "        device_class: timestamp"
@@ -104,12 +104,12 @@ module HaYaml =
                             let valueTemplate = sprintf "{{ state_attr('sensor.eaton', '%s')['%s'] | float }}" deviceId valueType
 
                             [
-                                $"      - unique_id: {name}"
+                                $"      - unique_id: {uniqueId}"
                                 $"        name: \"{Device.effectiveName sensor}\""
                                 $"        state: \"{valueTemplate}\""
                                 $"        unit_of_measurement: \"{unitOfMeasurement}\""
                                 $"        device_class: {valueType}"
-                                $"      - unique_id: {name}_last_update"
+                                $"      - unique_id: {uniqueId}_last_update"
                                 $"        name: \"{Device.effectiveName sensor} (last update)\""
                                 $"        state: \"{{{{ state_attr('sensor.eaton', '{deviceId}')['last_update'] }}}}\""
                                 "        device_class: timestamp"
@@ -119,16 +119,19 @@ module HaYaml =
         ]
 
     let lightLines currentHost (dimmers: Device list) : string list =
-        let dimmerId (device: Device) =
+        let dimmerAttrId (device: Device) =
             device.DeviceId |> DeviceId.id
+
+        let dimmerId (device: Device) =
+            Device.effectiveId device
 
         let dimmerChildren =
             dimmers
             |> List.collect (fun device -> device.Children)
 
-        let dimmerIds =
+        let dimmerAttrIds =
             dimmerChildren
-            |> List.map dimmerId
+            |> List.map dimmerAttrId
 
         [
             "sensor:"
@@ -139,7 +142,7 @@ module HaYaml =
             "    value_template: OK"
             "    json_attributes_path: \"$.Brightness\""
             "    json_attributes:"
-            yield! dimmerIds |> List.map (fun id -> $"      - {id}")
+            yield! dimmerAttrIds |> List.map (fun id -> $"      - {id}")
 
             ""
             "rest_command:"
@@ -167,12 +170,13 @@ module HaYaml =
                 dimmerChildren
                 |> List.collect (fun device ->
                     let id = dimmerId device
+                    let attrId = dimmerAttrId device
                     [
                         $"      eaton_light_{id}:"
                         $"        friendly_name: \"{Device.effectiveName device}\""
                         $"        level_template: >-"
-                        $"          {{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) * 255 / 100 }}}}"
-                        $"        value_template: \"{{{{ (state_attr('sensor.eaton_brightness', '{id}') | int(0)) > 0 }}}}\""
+                        $"          {{{{ (state_attr('sensor.eaton_brightness', '{attrId}') | int(0)) * 255 / 100 }}}}"
+                        $"        value_template: \"{{{{ (state_attr('sensor.eaton_brightness', '{attrId}') | int(0)) > 0 }}}}\""
                         "        turn_on:"
                         $"          action: rest_command.eaton_{id}_set_level"
                         "          data:"
@@ -204,7 +208,7 @@ module HaYaml =
                 yield!
                     withZone
                     |> List.collect (fun (device, zoneId) ->
-                        let id = device.DeviceId |> DeviceId.id
+                        let id = Device.effectiveId device
                         let sensorName = $"eaton_climate_{id}"
                         [
                             "  - platform: rest"
@@ -223,7 +227,7 @@ module HaYaml =
                 yield!
                     withZone
                     |> List.collect (fun (device, zoneId) ->
-                        let id = device.DeviceId |> DeviceId.id
+                        let id = Device.effectiveId device
                         let restCommandName = $"eaton_climate_{id}_set_temp"
                         [
                             $"  {restCommandName}:"
@@ -242,7 +246,7 @@ module HaYaml =
                 yield!
                     withZone
                     |> List.collect (fun (device, _zoneId) ->
-                        let id = device.DeviceId |> DeviceId.id
+                        let id = Device.effectiveId device
                         let sensorName = $"eaton_climate_{id}"
                         let restCommandName = $"eaton_climate_{id}_set_temp"
                         let climateId = $"eaton_climate_{id}"

@@ -15,6 +15,7 @@ let private makeDevice name deviceId deviceType children = {
     Powered = PowerStatus.Always
     Children = children
     Zone = None
+    IdOverride = None
 }
 
 let private child name deviceId deviceType =
@@ -39,18 +40,19 @@ let haYamlTests =
             let sensor = child "Living Room" "hdm:xComfort Adapter:1234_u0" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
             let lines = HaYaml.templateSensorLines [ device ]
+            let id = "hdm_xComfort_Adapter_1234_u0"
             Expect.equal lines [
                 ""
                 "template:"
                 "  - sensor:"
-                "      - unique_id: eaton_living_room"
+                $"      - unique_id: {id}"
                 "        name: \"Living Room\""
-                "        state: \"{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_1234_u0')['value'] | float }}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['value'] | float }}}}\""
                 "        unit_of_measurement: \"... add manually ...\""
                 "        device_class: value"
-                "      - unique_id: eaton_living_room_last_update"
+                $"      - unique_id: {id}_last_update"
                 "        name: \"Living Room (last update)\""
-                "        state: \"{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_1234_u0')['last_update'] }}\""
+                $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['last_update'] }}}}\""
                 "        device_class: timestamp"
             ] "analog sensor lines"
         }
@@ -64,38 +66,38 @@ let haYamlTests =
                 ""
                 "template:"
                 "  - sensor:"
-                "      - unique_id: eaton_room_heating_temperature"
+                $"      - unique_id: {id}_temperature"
                 "        name: \"Room Heating (temperature)\""
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['temperature'] | float }}}}\""
                 "        unit_of_measurement: \"°C\""
                 "        device_class: temperature"
-                "      - unique_id: eaton_room_heating_power_percentage"
+                $"      - unique_id: {id}_power_percentage"
                 "        name: \"Room Heating (power_percentage)\""
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['power_percentage'] | float }}}}\""
                 "        unit_of_measurement: \"%\""
                 "        device_class: power_factor"
-                "      - unique_id: eaton_room_heating_power"
+                $"      - unique_id: {id}_power"
                 "        name: \"Room Heating (power)\""
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['power'] | float }}}}\""
                 "        unit_of_measurement: \"W\""
                 "        device_class: power"
-                "      - unique_id: eaton_room_heating_overload"
+                $"      - unique_id: {id}_overload"
                 "        name: \"Room Heating (overload)\""
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['overload'] | float }}}}\""
                 "        unit_of_measurement: \"\""
                 "        device_class: value"
-                "      - unique_id: eaton_room_heating_last_update"
+                $"      - unique_id: {id}_last_update"
                 "        name: \"Room Heating (last update)\""
                 $"        state: \"{{{{ state_attr('sensor.eaton', '{id}')['last_update'] }}}}\""
                 "        device_class: timestamp"
             ] "heating actuator all metric lines"
         }
 
-        test "Czech characters in name are transliterated in unique_id but kept in display name" {
+        test "Czech characters in name are kept in display name; unique_id uses device id" {
             let sensor = child "Obývací pokoj" "hdm:xComfort Adapter:9999_u0" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
             let lines = HaYaml.templateSensorLines [ device ]
-            Expect.exists lines (fun l -> l.Contains "unique_id: eaton_obyvaci_pokoj") "unique_id transliterated"
+            Expect.exists lines (fun l -> l.Contains "unique_id: hdm_xComfort_Adapter_9999_u0") "unique_id is device id"
             Expect.exists lines (fun l -> l.Contains "name: \"Obývací pokoj\"") "display name unchanged"
         }
 
@@ -104,8 +106,17 @@ let haYamlTests =
             let s2 = child "Sensor B" "device_B" (Sensor AnalogSensor)
             let device = makeDevice "Zone" "parent_id" (Other None) [ s1; s2 ]
             let lines = HaYaml.templateSensorLines [ device ]
-            Expect.exists lines (fun l -> l.Contains "unique_id: eaton_sensor_a") "sensor A present"
-            Expect.exists lines (fun l -> l.Contains "unique_id: eaton_sensor_b") "sensor B present"
+            Expect.exists lines (fun l -> l.Contains "unique_id: device_A") "sensor A present"
+            Expect.exists lines (fun l -> l.Contains "unique_id: device_B") "sensor B present"
+        }
+
+        test "id override changes unique_id but not state_attr attribute key" {
+            let sensor = { child "Living Room" "hdm:xComfort Adapter:1234_u0" (Sensor AnalogSensor) with IdOverride = Some "my_living_room" }
+            let device = makeDevice "Zone" "parent_id" (Other None) [ sensor ]
+            let lines = HaYaml.templateSensorLines [ device ]
+            Expect.exists lines (fun l -> l.Contains "unique_id: my_living_room") "override used for unique_id"
+            Expect.exists lines (fun l -> l.Contains "state_attr('sensor.eaton', 'hdm_xComfort_Adapter_1234_u0')") "attribute key unchanged"
+            Expect.isFalse (lines |> List.exists (fun l -> l.Contains "unique_id: hdm_xComfort_Adapter_1234_u0")) "original id not in unique_id"
         }
     ]
 

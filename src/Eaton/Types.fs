@@ -83,6 +83,8 @@ type Device = {
     Children: Device list
 
     Zone: ZoneId option
+
+    IdOverride: string option
 }
 
 and [<RequireQualifiedAccess>] Rssi =
@@ -290,6 +292,11 @@ module Device =
 
     let effectiveName (device: Device) =
         if device.DisplayName <> "" then device.DisplayName else device.Name
+
+    let effectiveId (device: Device) : string =
+        match device.IdOverride with
+        | Some id -> id
+        | None -> device.DeviceId |> DeviceId.id
 
 [<RequireQualifiedAccess>]
 module DeviceStat =
