@@ -78,6 +78,62 @@ not report (e.g. possibly shutter position) — document such limitations in
 - **JSON provider schemas** live in `src/Eaton/schema/*.json`; adding a response field means
   updating the sample so the type provider picks it up.
 
+## Web GUI routing (Home Assistant Ingress)
+
+The GUI ([src/Core/WebServer/View.fs](../../src/Core/WebServer/View.fs)) is served **inside
+an HA Ingress `<iframe>`** under a path prefix like `/api/hassio_ingress/<token>/`. Absolute
+URLs (leading `/`) escape that prefix and break. Follow these rules:
+
+- **Never navigate between GUI screens with a route/link.** Secondary screens (settings,
+  editors, detail views) **must be rendered as modals** on the page that opens them —
+  render the modal body server-side into the parent page (the data is already loaded) and
+  toggle it with `classList.add/remove('hidden')`. No page load = no ingress prefix problem.
+  Provide close via a button, backdrop click, and `Esc`.
+- **Entry points are buttons, not `<a href>`.** Open a modal with
+  `button [ _onclick "openX()" ]`, not `a [ _href "/x" ]`.
+- **All in-app URLs must be ingress-relative** (no leading `/`). For `fetch`, derive the
+  path from `window.location.pathname` (see `configUrl()` in `View.fs`), e.g. strip a
+  trailing screen segment + slash then append the endpoint. Use `_href "."` for any
+  unavoidable "back to index" link.
+- **Exception — generated HA YAML URLs stay absolute.** The `resource:` / `state_resource:`
+  values built from `CurrentHost` (`host:port`) are called **server-to-server by Home
+  Assistant**, not through the browser/ingress — leave them as full `http://host:port/...`.
+- Keep any `GET` HTML route (e.g. `/config`) as a **non-ingress fallback** only; the modal
+  is the primary UX. If kept, fix its links to be relative too.
+
+Reference pattern (extract the screen body into a reusable `XmlNode list`, render it into a
+hidden overlay on the parent page, and toggle with JS):
+
+```fsharp
+// entry point — button, not an <a href>
+button [ _class "..."; _onclick "openSettings()" ] [ str "⚙ Entity Settings" ]
+
+// modal overlay, hidden by default, rendered server-side into the parent page
+div [ _id "settingsModal"; _class "hidden fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"; _onclick "onModalBackdrop(event)" ] [
+    div [ _class "bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-5xl my-8 p-6" ] [
+        div [ _class "flex justify-between items-center mb-4" ] [
+            h2 [ _class "text-2xl font-bold" ] [ str "Entity Settings" ]
+            button [ _class "..."; _onclick "closeSettings()" ] [ str "✕ Close" ]
+        ]
+        yield! settingsFormBody parameters   // the shared screen body
+    ]
+]
+```
+
+```js
+function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+function onModalBackdrop(e) { if (e.target && e.target.id === 'settingsModal') closeSettings(); }
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSettings(); });
+
+// ingress-safe endpoint URL for fetch (strip a trailing screen segment + slash, then append)
+function configUrl() {
+    var p = window.location.pathname.replace(/\/config\/?$/, '').replace(/\/$/, '');
+    return p + '/config';
+}
+// then: fetch(configUrl(), { method: 'POST', ... })  — never fetch('/config', ...)
+```
+
 ## F# conventions (enforced by lint)
 
 - `[<RequireQualifiedAccess>]` on modules meant to be called qualified.

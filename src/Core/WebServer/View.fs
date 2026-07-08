@@ -210,10 +210,221 @@ tailwind.config = { darkMode: 'class' };
                 |> htmlYaml
             ]
 
+        type ConfigParameters = {
+            Devices: Device list
+            Settings: Settings
+        }
+
+        let private saveConfigScript = """
+function configUrl() {
+    var p = window.location.pathname.replace(/\/config\/?$/, '').replace(/\/$/, '');
+    return p + '/config';
+}
+function saveConfig() {
+    var nameInputs = document.querySelectorAll('input[type="text"][name^="name_"]');
+    var entities = [];
+    nameInputs.forEach(function(el) {
+        var id = el.name.replace(/^name_/, '');
+        var checkboxEl = document.querySelector('input[type="checkbox"][name="visible_' + id + '"]');
+        var idOverrideEl = document.querySelector('input[type="text"][name="id_' + id + '"]');
+        var visible = checkboxEl ? checkboxEl.checked : true;
+        var displayName = el.value.trim();
+        var idOverride = idOverrideEl ? idOverrideEl.value.trim() : '';
+        entities.push({
+            DeviceId: id,
+            Visible: visible,
+            DisplayName: displayName.length > 0 ? displayName : null,
+            IdOverride: idOverride.length > 0 ? idOverride : null
+        });
+    });
+    var zoneInputs = document.querySelectorAll('input[type="text"][name^="zone_"]');
+    var zones = [];
+    zoneInputs.forEach(function(el) {
+        var zoneId = el.name.replace(/^zone_/, '');
+        var displayName = el.value.trim();
+        zones.push({ ZoneId: zoneId, DisplayName: displayName.length > 0 ? displayName : null });
+    });
+    fetch(configUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Entities: entities, Zones: zones })
+    }).then(function(r) {
+        var msg = document.getElementById('saveMsg');
+        msg.classList.remove('hidden');
+        if (r.ok) {
+            msg.className = 'mt-4 px-4 py-3 rounded bg-green-100 border border-green-400 text-green-800 dark:bg-green-900/20 dark:text-green-200';
+            msg.textContent = 'Settings saved! Reload the index page to see updated YAML.';
+        } else {
+            msg.className = 'mt-4 px-4 py-3 rounded bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/20 dark:text-red-200';
+            msg.textContent = 'Error saving settings.';
+        }
+    }).catch(function(e) {
+        var msg = document.getElementById('saveMsg');
+        msg.classList.remove('hidden');
+        msg.className = 'mt-4 px-4 py-3 rounded bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/20 dark:text-red-200';
+        msg.textContent = 'Network error: ' + e.message;
+    });
+}
+"""
+
+        let private settingsFormBody (parameters: ConfigParameters) : XmlNode list =
+            let settingsMap =
+                parameters.Settings.Entities
+                |> List.map (fun e -> e.DeviceId, e)
+                |> Map.ofList
+
+            let getVisible id =
+                settingsMap |> Map.tryFind id |> Option.map (fun e -> e.Visible) |> Option.defaultValue true
+
+            let getDisplayName id =
+                settingsMap |> Map.tryFind id |> Option.bind (fun e -> e.DisplayName) |> Option.defaultValue ""
+
+            let getIdOverride id =
+                settingsMap |> Map.tryFind id |> Option.bind (fun e -> e.IdOverride) |> Option.defaultValue ""
+
+            let typeLabel = function
+                | Actuator HeatingActuator -> "Heating Actuator"
+                | Actuator ShutterActuator -> "Cover"
+                | Actuator DimmerActuator -> "Light"
+                | Actuator SwitchActuator -> "Switch"
+                | Sensor AnalogSensor -> "Sensor"
+                | Thermostat ThermostatSubType.RoomController -> "Climate"
+                | Thermostat ThermostatSubType.TemperatureSensor -> "Temperature Sensor"
+                | Thermostat ThermostatSubType.HumiditySensor -> "Humidity Sensor"
+                | Thermostat ThermostatSubType.Adjustment -> "Temp. Adjustment"
+                | PushButton -> "Push Button"
+                | Other _ -> "Other"
+
+            let entitiesToConfigure =
+                parameters.Devices
+                |> List.collect (fun device ->
+                    if Device.isHeating device then
+                        let zone = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "-"
+                        [ zone, device ]
+                    else
+                        device.Children
+                        |> List.map (fun child ->
+                            let zone =
+                                child.Zone
+                                |> Option.orElse device.Zone
+                                |> Option.map ZoneId.value
+                                |> Option.defaultValue "-"
+                            zone, child
+                        )
+                )
+                |> List.sortBy (fun (zone, device) -> zone, device.Name)
+
+            let distinctZones =
+                entitiesToConfigure
+                |> List.map fst
+                |> List.distinct
+                |> List.sort
+
+            [
+                h2 [ _class "text-2xl font-semibold mb-2" ] [ str "Zone Names" ]
+                p [ _class "mb-3 text-gray-600 dark:text-gray-400" ] [ str "Give each zone a human-readable label. The raw zone id is still used in generated payloads." ]
+                div [ _class "overflow-x-auto mb-8" ] [
+                    table [ _class "w-full text-sm border-collapse" ] [
+                        thead [ _class "bg-gray-100 dark:bg-gray-700" ] [
+                            tr [] [
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Zone Id" ]
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Display Name" ]
+                            ]
+                        ]
+                        tbody [] [
+                            yield!
+                                distinctZones
+                                |> List.map (fun zoneId ->
+                                    let currentLabel =
+                                        Settings.zoneDisplayName parameters.Settings zoneId
+                                        |> Option.defaultValue ""
+                                    tr [ _class "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800" ] [
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ code [ _class "text-xs" ] [ str zoneId ] ]
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
+                                            input [
+                                                _type "text"
+                                                _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
+                                                _name $"zone_{zoneId}"
+                                                _placeholder zoneId
+                                                _value currentLabel
+                                            ]
+                                        ]
+                                    ]
+                                )
+                        ]
+                    ]
+                ]
+                h2 [ _class "text-2xl font-semibold mb-2" ] [ str "Entity Settings" ]
+                p [ _class "mb-3 text-gray-600 dark:text-gray-400" ] [ str "Toggle visibility, set custom display names, and override entity ids. Invisible entities are excluded from the generated YAML." ]
+                div [ _class "overflow-x-auto mb-8" ] [
+                    table [ _class "w-full text-sm border-collapse" ] [
+                        thead [ _class "bg-gray-100 dark:bg-gray-700" ] [
+                            tr [] [
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Zone" ]
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Type" ]
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Eaton Name" ]
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Display Name Override" ]
+                                th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Id Override" ]
+                                th [ _class "text-center px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Visible" ]
+                            ]
+                        ]
+                        tbody [] [
+                            yield!
+                                entitiesToConfigure
+                                |> List.map (fun (zone, device) ->
+                                    let id = device.DeviceId |> DeviceId.id
+                                    let visible = getVisible id
+                                    let displayName = getDisplayName id
+                                    let idOverride = getIdOverride id
+                                    let zoneLabel =
+                                        Settings.zoneDisplayName parameters.Settings zone
+                                        |> Option.defaultValue zone
+
+                                    tr [ _class "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800" ] [
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ str zoneLabel ]
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ small [ _class "text-xs text-gray-500 dark:text-gray-400" ] [ str (typeLabel device.Type) ] ]
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ code [ _class "text-xs" ] [ str device.Name ] ]
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
+                                            input [
+                                                _type "text"
+                                                _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
+                                                _name $"name_{id}"
+                                                _placeholder device.Name
+                                                _value displayName
+                                            ]
+                                        ]
+                                        td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
+                                            input [
+                                                _type "text"
+                                                _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
+                                                _name $"id_{id}"
+                                                _placeholder id
+                                                _value idOverride
+                                            ]
+                                        ]
+                                        td [ _class "text-center px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
+                                            input (
+                                                [ _type "checkbox"; _name $"visible_{id}"; _class "w-4 h-4" ]
+                                                @ (if visible then [ _checked ] else [])
+                                            )
+                                        ]
+                                    ]
+                                )
+                        ]
+                    ]
+                ]
+                button [
+                    _class "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    _onclick "saveConfig()"
+                ] [ str "Save Settings" ]
+                div [ _id "saveMsg"; _class "hidden mt-4 px-4 py-3 rounded" ] []
+            ]
+
         type IndexParameters = {
             CurrentHost: string
             Devices: Device list
             Scenes: Scene list
+            Settings: Settings
         }
 
         let index parameters =
@@ -244,7 +455,12 @@ tailwind.config = { darkMode: 'class' };
                                 _onclick "toggleDark()"
                             ] [ str "Toggle Dark" ]
                         ]
-                        p [ _class "mb-6" ] [ a [ _href "/config"; _class "text-blue-600 dark:text-blue-400 hover:underline" ] [ str "⚙ Entity Settings" ] ]
+                        p [ _class "mb-6" ] [
+                            button [
+                                _class "text-blue-600 dark:text-blue-400 hover:underline"
+                                _onclick "openSettings()"
+                            ] [ str "⚙ Entity Settings" ]
+                        ]
 
                         h2 [ _class "text-2xl font-semibold mb-4" ] [ str "Add following to your configuration.yaml" ]
 
@@ -263,6 +479,22 @@ tailwind.config = { darkMode: 'class' };
                         if heatings |> List.isEmpty |> not then climateRow parameters.CurrentHost heatings
                         healthRow parameters.CurrentHost
                     ]
+                    div [
+                        _id "settingsModal"
+                        _class "hidden fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
+                        _onclick "onModalBackdrop(event)"
+                    ] [
+                        div [ _class "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-full max-w-5xl my-8 p-6"; _id "settingsModalPanel" ] [
+                            div [ _class "flex justify-between items-center mb-4" ] [
+                                h2 [ _class "text-2xl font-bold" ] [ str "Entity Settings" ]
+                                button [
+                                    _class "px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    _onclick "closeSettings()"
+                                ] [ str "✕ Close" ]
+                            ]
+                            yield! settingsFormBody { Devices = parameters.Devices; Settings = parameters.Settings }
+                        ]
+                    ]
                     script [] [
                         rawText """
 function toggleDark() {
@@ -272,72 +504,29 @@ function toggleDark() {
     localStorage.setItem('theme', dark ? 'dark' : 'light');
     if (window.__applyPrismTheme) window.__applyPrismTheme(dark);
 }
+function openSettings() {
+    document.getElementById('settingsModal').classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+}
+function closeSettings() {
+    document.getElementById('settingsModal').classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+}
+function onModalBackdrop(e) {
+    if (e.target && e.target.id === 'settingsModal') closeSettings();
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSettings();
+});
 """
+                    ]
+                    script [] [
+                        rawText saveConfigScript
                     ]
                 ]
             ]
 
-        type ConfigParameters = {
-            Devices: Device list
-            Settings: Settings
-        }
-
         let configPage (parameters: ConfigParameters) =
-            let settingsMap =
-                parameters.Settings.Entities
-                |> List.map (fun e -> e.DeviceId, e)
-                |> Map.ofList
-
-            let getVisible id =
-                settingsMap |> Map.tryFind id |> Option.map (fun e -> e.Visible) |> Option.defaultValue true
-
-            let getDisplayName id =
-                settingsMap |> Map.tryFind id |> Option.bind (fun e -> e.DisplayName) |> Option.defaultValue ""
-
-            let getIdOverride id =
-                settingsMap |> Map.tryFind id |> Option.bind (fun e -> e.IdOverride) |> Option.defaultValue ""
-
-            let typeLabel = function
-                | Actuator HeatingActuator -> "Heating Actuator"
-                | Actuator ShutterActuator -> "Cover"
-                | Actuator DimmerActuator -> "Light"
-                | Actuator SwitchActuator -> "Switch"
-                | Sensor AnalogSensor -> "Sensor"
-                | Thermostat ThermostatSubType.RoomController -> "Climate"
-                | Thermostat ThermostatSubType.TemperatureSensor -> "Temperature Sensor"
-                | Thermostat ThermostatSubType.HumiditySensor -> "Humidity Sensor"
-                | Thermostat ThermostatSubType.Adjustment -> "Temp. Adjustment"
-                | PushButton -> "Push Button"
-                | Other _ -> "Other"
-
-            // Entities that appear in the generated YAML:
-            // - for heating: the parent RoomController is the climate entity
-            // - for all others: the children are the entities
-            let entitiesToConfigure =
-                parameters.Devices
-                |> List.collect (fun device ->
-                    if Device.isHeating device then
-                        let zone = device.Zone |> Option.map ZoneId.value |> Option.defaultValue "-"
-                        [ zone, device ]
-                    else
-                        device.Children
-                        |> List.map (fun child ->
-                            let zone =
-                                child.Zone
-                                |> Option.orElse device.Zone
-                                |> Option.map ZoneId.value
-                                |> Option.defaultValue "-"
-                            zone, child
-                        )
-                )
-                |> List.sortBy (fun (zone, device) -> zone, device.Name)
-
-            let distinctZones =
-                entitiesToConfigure
-                |> List.map fst
-                |> List.distinct
-                |> List.sort
-
             html [ _class "bg-white dark:bg-gray-900" ] [
                 htmlHead
                 body [ _class "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen" ] [
@@ -349,108 +538,11 @@ function toggleDark() {
                                 _onclick "toggleDark()"
                             ] [ str "Toggle Dark" ]
                         ]
-                        p [ _class "mb-6" ] [ a [ _href "/"; _class "text-blue-600 dark:text-blue-400 hover:underline" ] [ str "← Back to index" ] ]
-
-                        h2 [ _class "text-2xl font-semibold mb-2" ] [ str "Zone Names" ]
-                        p [ _class "mb-3 text-gray-600 dark:text-gray-400" ] [ str "Give each zone a human-readable label. The raw zone id is still used in generated payloads." ]
-                        div [ _class "overflow-x-auto mb-8" ] [
-                            table [ _class "w-full text-sm border-collapse" ] [
-                                thead [ _class "bg-gray-100 dark:bg-gray-700" ] [
-                                    tr [] [
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Zone Id" ]
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Display Name" ]
-                                    ]
-                                ]
-                                tbody [] [
-                                    yield!
-                                        distinctZones
-                                        |> List.map (fun zoneId ->
-                                            let currentLabel =
-                                                Settings.zoneDisplayName parameters.Settings zoneId
-                                                |> Option.defaultValue ""
-                                            tr [ _class "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800" ] [
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ code [ _class "text-xs" ] [ str zoneId ] ]
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
-                                                    input [
-                                                        _type "text"
-                                                        _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
-                                                        _name $"zone_{zoneId}"
-                                                        _placeholder zoneId
-                                                        _value currentLabel
-                                                    ]
-                                                ]
-                                            ]
-                                        )
-                                ]
-                            ]
-                        ]
-
-                        h2 [ _class "text-2xl font-semibold mb-2" ] [ str "Entity Settings" ]
-                        p [ _class "mb-3 text-gray-600 dark:text-gray-400" ] [ str "Toggle visibility, set custom display names, and override entity ids. Invisible entities are excluded from the generated YAML." ]
-                        div [ _class "overflow-x-auto mb-8" ] [
-                            table [ _class "w-full text-sm border-collapse" ] [
-                                thead [ _class "bg-gray-100 dark:bg-gray-700" ] [
-                                    tr [] [
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Zone" ]
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Type" ]
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Eaton Name" ]
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Display Name Override" ]
-                                        th [ _class "text-left px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Id Override" ]
-                                        th [ _class "text-center px-3 py-2 border border-gray-200 dark:border-gray-600" ] [ str "Visible" ]
-                                    ]
-                                ]
-                                tbody [] [
-                                    yield!
-                                        entitiesToConfigure
-                                        |> List.map (fun (zone, device) ->
-                                            let id = device.DeviceId |> DeviceId.id
-                                            let visible = getVisible id
-                                            let displayName = getDisplayName id
-                                            let idOverride = getIdOverride id
-                                            let zoneLabel =
-                                                Settings.zoneDisplayName parameters.Settings zone
-                                                |> Option.defaultValue zone
-
-                                            tr [ _class "odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800" ] [
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ str zoneLabel ]
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ small [ _class "text-xs text-gray-500 dark:text-gray-400" ] [ str (typeLabel device.Type) ] ]
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [ code [ _class "text-xs" ] [ str device.Name ] ]
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
-                                                    input [
-                                                        _type "text"
-                                                        _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
-                                                        _name $"name_{id}"
-                                                        _placeholder device.Name
-                                                        _value displayName
-                                                    ]
-                                                ]
-                                                td [ _class "px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
-                                                    input [
-                                                        _type "text"
-                                                        _class "w-full px-2 py-1 text-sm border rounded bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100"
-                                                        _name $"id_{id}"
-                                                        _placeholder id
-                                                        _value idOverride
-                                                    ]
-                                                ]
-                                                td [ _class "text-center px-3 py-1 border border-gray-200 dark:border-gray-600" ] [
-                                                    input (
-                                                        [ _type "checkbox"; _name $"visible_{id}"; _class "w-4 h-4" ]
-                                                        @ (if visible then [ _checked ] else [])
-                                                    )
-                                                ]
-                                            ]
-                                        )
-                                ]
-                            ]
-                        ]
-                        button [
-                            _class "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                            _onclick "saveConfig()"
-                        ] [ str "Save Settings" ]
-                        div [ _id "saveMsg"; _class "hidden mt-4 px-4 py-3 rounded" ] []
-                        script [] [
-                            rawText """
+                        p [ _class "mb-6" ] [ a [ _href "."; _class "text-blue-600 dark:text-blue-400 hover:underline" ] [ str "← Back to index" ] ]
+                        yield! settingsFormBody parameters
+                    ]
+                    script [] [
+                        rawText """
 function toggleDark() {
     var html = document.documentElement;
     var dark = !html.classList.contains('dark');
@@ -458,53 +550,10 @@ function toggleDark() {
     localStorage.setItem('theme', dark ? 'dark' : 'light');
     if (window.__applyPrismTheme) window.__applyPrismTheme(dark);
 }
-function saveConfig() {
-    var nameInputs = document.querySelectorAll('input[type="text"][name^="name_"]');
-    var entities = [];
-    nameInputs.forEach(function(el) {
-        var id = el.name.replace(/^name_/, '');
-        var checkboxEl = document.querySelector('input[type="checkbox"][name="visible_' + id + '"]');
-        var idOverrideEl = document.querySelector('input[type="text"][name="id_' + id + '"]');
-        var visible = checkboxEl ? checkboxEl.checked : true;
-        var displayName = el.value.trim();
-        var idOverride = idOverrideEl ? idOverrideEl.value.trim() : '';
-        entities.push({
-            DeviceId: id,
-            Visible: visible,
-            DisplayName: displayName.length > 0 ? displayName : null,
-            IdOverride: idOverride.length > 0 ? idOverride : null
-        });
-    });
-    var zoneInputs = document.querySelectorAll('input[type="text"][name^="zone_"]');
-    var zones = [];
-    zoneInputs.forEach(function(el) {
-        var zoneId = el.name.replace(/^zone_/, '');
-        var displayName = el.value.trim();
-        zones.push({ ZoneId: zoneId, DisplayName: displayName.length > 0 ? displayName : null });
-    });
-    fetch('/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Entities: entities, Zones: zones })
-    }).then(function(r) {
-        var msg = document.getElementById('saveMsg');
-        msg.classList.remove('hidden');
-        if (r.ok) {
-            msg.className = 'mt-4 px-4 py-3 rounded bg-green-100 border border-green-400 text-green-800 dark:bg-green-900/20 dark:text-green-200';
-            msg.textContent = 'Settings saved! Reload the index page to see updated YAML.';
-        } else {
-            msg.className = 'mt-4 px-4 py-3 rounded bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/20 dark:text-red-200';
-            msg.textContent = 'Error saving settings.';
-        }
-    }).catch(function(e) {
-        var msg = document.getElementById('saveMsg');
-        msg.classList.remove('hidden');
-        msg.className = 'mt-4 px-4 py-3 rounded bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/20 dark:text-red-200';
-        msg.textContent = 'Network error: ' + e.message;
-    });
-}
 """
-                        ]
+                    ]
+                    script [] [
+                        rawText saveConfigScript
                     ]
                 ]
             ]

@@ -2,6 +2,12 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Convert Entity Settings from a separate `/config` page to an inline modal on the index page — fixes opening settings via HA Ingress iframe (no navigation required, no absolute-URL 404)
+- Replace `⚙ Entity Settings` link with a button that opens the modal (`openSettings()` / `closeSettings()` / backdrop click / `Esc`)
+- Extract `settingsFormBody` shared helper to render the settings form on both the modal and the standalone `/config` fallback page
+- Extract `saveConfigScript` with `configUrl()` — `fetch` target derived from `window.location.pathname` so it is ingress-relative
+- Fix `GET /config` fallback page: change "← Back to index" from `href="/"` to `href="."` (ingress-relative)
+- Pass `Settings` through `IndexParameters` so the modal is rendered fully server-side with no extra request
 
 ## 1.18.1 - 2026-07-08
 - Fix unset option

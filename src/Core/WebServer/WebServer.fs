@@ -116,6 +116,7 @@ module WebServer =
             CurrentHost = $"{host}:{port}"
             Devices = effectiveDevices
             Scenes = scenes
+            Settings = settingsCache
         }
     }
 
