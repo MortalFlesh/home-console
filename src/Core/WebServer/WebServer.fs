@@ -267,11 +267,7 @@ module WebServer =
         return {| Status = "Ok" |}
     }
 
-    let private version =
-        System.Reflection.Assembly.GetEntryAssembly()
-        |> Option.ofObj
-        |> Option.map (fun a -> a.GetName().Version |> string)
-        |> Option.defaultValue "unknown"
+    let private version = Version.value
 
     let private health: Action<_> = fun _ _ _ -> asyncResult {
         let status = if zonesCache.IsSome then "ok" else "degraded"

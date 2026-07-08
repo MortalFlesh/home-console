@@ -105,12 +105,7 @@ module RunWebServerCommand =
 
         output.Section "Run webserver"
 
-        let version =
-            System.Reflection.Assembly.GetEntryAssembly()
-            |> Option.ofObj
-            |> Option.map (fun a -> a.GetName().Version |> string)
-            |> Option.defaultValue "unknown"
-        output.Message(sprintf "Version: %s | Data: %s | Port: %d" version config.Data.Directory port)
+        output.Message(sprintf "Version: %s | Data: %s | Port: %d" Version.value config.Data.Directory port)
 
         let rec mapApiError = function
             | ApiError.Exception e -> CommandError.Exception e
