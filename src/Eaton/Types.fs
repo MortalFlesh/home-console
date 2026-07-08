@@ -236,8 +236,8 @@ module DeviceType =
 
         | Some (String.Contains "Actuator" as deviceType) ->
             match deviceType with
-            | String.Contains "Dimmer" -> Actuator DimmerActuator
-            | String.Contains "Shutter" -> Actuator ShutterActuator
+            | String.Contains "Dimmer" | String.Contains "Dimming" -> Actuator DimmerActuator
+            | String.Contains "Shutter" | String.Contains "Shading" -> Actuator ShutterActuator
             | String.Contains "Switch" -> Actuator SwitchActuator
             | String.Contains "Heating" -> Actuator HeatingActuator
             | other -> Other (Some other)
