@@ -53,8 +53,12 @@ module RunWebServerCommand =
         let dataDir = optionValue "data-path" |> resolveDataDir
 
         let deriveOrUse option derived =
-            let v = optionValue option
-            if v <> "" then v else derived
+            // cookies-path/history-path are optional with no default, so they are unset
+            // when the HA add-on only passes --host/--name/--password/--data-path.
+            // Use asString (returns None when not set) instead of value (which throws).
+            match input |> Input.Option.asString option with
+            | Some v when v <> "" -> v
+            | _ -> derived
 
         let directConfig =
             try Some {
@@ -72,7 +76,7 @@ module RunWebServerCommand =
                 Data = { Directory = dataDir }
             }
             with e ->
-                if output.IsVeryVerbose() then output.Warning("Config from option values is not valid: %s", e.Message)
+                output.Warning("Config from option values is not valid: %s", e.Message)
                 None
 
         let! config =
