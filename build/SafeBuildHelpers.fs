@@ -31,10 +31,11 @@ module internal SafeBuildHelpers =
                     Console.ForegroundColor <- color
                     Console.Write colored
                     Console.ForegroundColor <- currentColor
-                    Console.WriteLine line)
+                    Console.WriteLine line
+                )
 
             let onStdout index name (line: string) =
-                let color = colors.[index % colors.Length]
+                let color = colors[index % colors.Length]
 
                 if isNull line then
                     print color $"{name}: --- END ---" ""
@@ -54,21 +55,40 @@ module internal SafeBuildHelpers =
 
             let printStarting indexed =
                 for (index, (name, c: CreateProcess<_>)) in indexed do
-                    let color = colors.[index % colors.Length]
+                    let color = colors[index % colors.Length]
                     let wd = c.WorkingDirectory |> Option.defaultValue ""
                     let exe = c.Command.Executable
                     let args = c.Command.Arguments.ToStartInfo
                     print color $"{name}: {wd}> {exe} {args}" ""
 
+            let private restoreTerminalState () =
+                // Reset basic TTY state in case an interrupted child process leaves it broken.
+                try
+                    use procHandle =
+                        Diagnostics.Process.Start(
+                            Diagnostics.ProcessStartInfo(
+                                FileName = "stty",
+                                Arguments = "sane",
+                                UseShellExecute = false
+                            )
+                        )
+
+                    procHandle.WaitForExit(1000) |> ignore
+                with _ ->
+                    ()
+
             let run cs =
-                cs
-                |> Seq.toArray
-                |> Array.indexed
-                |> fun x ->
-                    printStarting x
-                    x
-                |> Array.map redirect
-                |> Array.Parallel.map Proc.run
+                try
+                    cs
+                    |> Seq.toArray
+                    |> Array.indexed
+                    |> fun x ->
+                        printStarting x
+                        x
+                    |> Array.map redirect
+                    |> Array.Parallel.map Proc.run
+                finally
+                    restoreTerminalState ()
 
     let createProcess exe args dir =
         // Use `fromRawCommand` rather than `fromRawCommandLine`, as its behaviour is less likely to be misunderstood.

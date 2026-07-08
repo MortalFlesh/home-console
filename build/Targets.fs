@@ -50,6 +50,16 @@ module internal Targets =
                 |> runParallel
             )
 
+            Target.create "RunMirrord" (fun _ ->
+                run dotnet [ "build" ] safe.SharedPath
+                Environment.setEnvironVar "RUN_IN" "mirrord"
+                [
+                    "server", createProcess "mirrord" [ "exec"; "--config-file"; "../../.mirrord/mirrord.json"; "--"; "dotnet"; "watch"; "run" ] safe.ServerPath
+                    "client", dotnet [ "fable"; "watch"; "-o"; "output"; "-s"; "--run"; "npx"; "vite" ] safe.ClientPath
+                ]
+                |> runParallel
+            )
+
             Target.create "WatchTests" (fun _ ->
                 run dotnet [ "build" ] safe.SharedTestsPath
 
@@ -87,7 +97,7 @@ module internal Targets =
                     ==> "Tests" <=> "WatchTests"
 
                 "Build"
-                    ==> "Run"
+                    ==> "Run" <=> "RunMirrord"
             ]
 
     let init (definition: ProjectDefinition) =
@@ -343,8 +353,18 @@ module internal Targets =
                 Dotnet.runInRootOrFail "watch run"
             )
 
+            Target.create "WatchMirrord" (fun _ ->
+                Environment.setEnvironVar "RUN_IN" "mirrord"
+                run (createProcess "mirrord") "exec --config-file .mirrord/mirrord.json -- dotnet watch run" "."
+            )
+
             Target.create "Run" (fun _ ->
                 Dotnet.runInRootOrFail "run"
+            )
+
+            Target.create "RunMirrord" (fun _ ->
+                Environment.setEnvironVar "RUN_IN" "mirrord"
+                run (createProcess "mirrord") "exec --config-file .mirrord/mirrord.json -- dotnet run" "."
             )
 
         // --------------------------------------------------------------------------------------------------------
@@ -374,7 +394,7 @@ module internal Targets =
                     ==> "ZipRelease"
 
                 "Build"
-                    ==> "Watch" <=> "Run"
+                    ==> "Watch" <=> "WatchMirrord" <=> "Run" <=> "RunMirrord"
             ]
 
         | { Specs = Executable _ } ->
@@ -384,7 +404,7 @@ module internal Targets =
                     ==> "Build"
                     ==> "Lint"
                     ==> "Tests"
-                    ==> "Release" <=> "Watch" <=> "Run"
+                    ==> "Release" <=> "Watch" <=> "WatchMirrord" <=> "Run" <=> "RunMirrord"
             ]
 
         | { Specs = SAFEStackApplication safe } ->

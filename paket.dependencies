@@ -1,16 +1,23 @@
 source https://api.nuget.org/v3/index.json
-framework: net8.0
+framework: net10.0
 storage: none
 
-nuget FSharp.Core ~> 8.0
-nuget FSharp.Data ~> 6.0
-nuget Microsoft.Extensions.Logging ~> 8.0
-nuget Microsoft.Extensions.Logging.Console ~> 8.0
+nuget FSharp.Core ~> 10.0
+nuget FSharp.Data ~> 8.0
+nuget Microsoft.Extensions.Logging ~> 10.0
+nuget Microsoft.Extensions.Logging.Console ~> 10.0
 nuget NReco.Logging.File ~> 1.1
 nuget Newtonsoft.Json ~> 13.0
-nuget MF.ConsoleApplication ~> 6.0
-nuget Giraffe ~> 6.0
-nuget Saturn ~> 0.16
+nuget Feather.ConsoleApplication ~> 2.0
+nuget Feather.ErrorHandling ~> 2.0
+nuget Giraffe ~> 8.0
+nuget Saturn ~> 0.17
+
+// [ TESTS GROUP ]
+group Tests
+    source https://api.nuget.org/v3/index.json
+    nuget Expecto
+    nuget YoloDev.Expecto.TestSdk
 
 // [ FAKE GROUP ]
 group Build

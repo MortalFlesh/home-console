@@ -1,7 +1,12 @@
 namespace MF.HomeConsole
 
+[<RequireQualifiedAccess>]
+module Version =
+    /// The application version, taken from the generated assembly info literal.
+    let value = System.AssemblyVersionInformation.AssemblyVersion
+
 module Console =
-    open MF.ConsoleApplication
+    open Feather.ConsoleApplication
 
     (* [<RequireQualifiedAccess>]
     module Argument =

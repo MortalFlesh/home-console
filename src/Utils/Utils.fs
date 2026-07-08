@@ -10,10 +10,10 @@ module FileSystem =
     let writeSeqToFile (filePath: string) (data: string seq) =
         File.WriteAllLines(filePath, data)
 
-    let writeToFile (filePath: string) data =
+    let writeToFile (filePath: string) (data: string) =
         File.WriteAllText(filePath, data)
 
-    let appendToFile (filePath: string) data =
+    let appendToFile (filePath: string) (data: string) =
         File.AppendAllText(filePath, data)
 
     let readLines (filePath: string) =
@@ -153,7 +153,7 @@ module Logging =
 
     [<RequireQualifiedAccess>]
     module LogLevel =
-        (* let fromVerbosity (verbosity: MF.ConsoleStyle.Verbosity) =
+        (* let fromVerbosity (verbosity: Feather.ConsoleStyle.Verbosity) =
             LogLevel.Trace *)
 
         let parse = normalizeString >> function

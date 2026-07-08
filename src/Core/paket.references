@@ -3,4 +3,5 @@ FSharp.Data
 Microsoft.Extensions.Logging
 Giraffe
 Saturn
-MF.ConsoleApplication
+Feather.ConsoleApplication
+Feather.ErrorHandling
