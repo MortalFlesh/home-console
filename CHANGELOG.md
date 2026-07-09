@@ -2,6 +2,7 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+- Allow to `stop` covers
 
 ## 1.19.1 - 2026-07-08
 - Add `String.slugify` helper: lowercases and replaces any character outside `[a-z0-9_]` with `_`

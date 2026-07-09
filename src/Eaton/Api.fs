@@ -886,6 +886,7 @@ module Api =
                 | _, Some "off" -> Off |> Ok
                 | _, Some "open" -> Open |> Ok
                 | _, Some "close" -> Close |> Ok
+                | _, Some "stop" -> Stop |> Ok
                 // other states are not supported yet
                 | invalidState -> Error $"Invalid state: {invalidState}"
 

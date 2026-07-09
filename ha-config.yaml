@@ -1,0 +1,1183 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+# Enable python scripts
+python_script:
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+sensor:
+  # Eaton - Vrch/Obývák - termostaty/topení/podlahovka
+  - platform: rest
+    resource: http://homeassistant.local:28080/sensors
+    scan_interval: 60
+    name: eaton
+    value_template: OK
+    json_attributes_path: "$.sensors"
+    json_attributes:
+      - hdm_xComfort_Adapter_8649687_w
+      - hdm_xComfort_Adapter_8649687_u0
+      - hdm_xComfort_Adapter_9214125_u0
+      - hdm_xComfort_Adapter_4131920_w
+      - hdm_xComfort_Adapter_4131920_u0
+      - hdm_xComfort_Adapter_4131920_u1
+  # Eaton - Stmívatelná světla
+  - platform: rest
+    resource: http://homeassistant.local:28080/brightness
+    scan_interval: 60
+    name: eaton_brightness
+    value_template: OK
+    json_attributes_path: "$.Brightness"
+    json_attributes:
+      - hdm_xComfort_Adapter_9367063_u0
+      - hdm_xComfort_Adapter_4119267_u0
+      - hdm_xComfort_Adapter_4119263_u0
+      - hdm_xComfort_Adapter_4116923_u0
+      - hdm_xComfort_Adapter_4139062_u0
+      - hdm_xComfort_Adapter_4203215_u0
+      - hdm_xComfort_Adapter_4119299_u0
+      #- hdm_xComfort_Adapter_4275181_u0
+      - hdm_xComfort_Adapter_4110125_u0
+      - hdm_xComfort_Adapter_4139192_u0
+      - hdm_xComfort_Adapter_4139113_u0
+      - hdm_xComfort_Adapter_3782040_u0
+      - hdm_xComfort_Adapter_4201923_u0
+      - hdm_xComfort_Adapter_4116920_u0
+      - hdm_xComfort_Adapter_4129662_u0
+
+template:
+  - sensor:
+    # Vrch - termostat/podlahovka
+    - unique_id: eaton_vrch_adjustment
+      name: "[Vrch] Regulace"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_8649687_w')['temperature'] | float }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      default_entity_id: sensor.eaton_vrch_adjustment
+    - unique_id: eaton_vrch_temperature
+      name: "[Vrch] Teplota"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_8649687_u0')['temperature'] | float }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      default_entity_id: sensor.eaton_vrch_temperature
+    - unique_id: eaton_vrch_podlaha_temperature # hdm_xComfort_Adapter_9214125_u0_temperature
+      name: "[Vrch] Podlaha (temperature)"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_9214125_u0')['temperature'] | float }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      default_entity_id: sensor.eaton_vrch_podlaha_temperature
+    - unique_id: eaton_vrch_podlaha_power_percentage # hdm_xComfort_Adapter_9214125_u0_power_percentage
+      name: "[Vrch] Podlaha (power_percentage)"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_9214125_u0')['power_percentage'] | float }}"
+      unit_of_measurement: "%"
+      device_class: power_factor
+      default_entity_id: sensor.eaton_vrch_podlaha_power_percentage
+    - unique_id: eaton_vrch_podlaha_power # hdm_xComfort_Adapter_9214125_u0_power
+      name: "[Vrch] Podlaha (power)"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_9214125_u0')['power'] | float }}"
+      unit_of_measurement: "W"
+      device_class: power
+      default_entity_id: sensor.eaton_vrch_podlaha_power
+    #- unique_id: hdm_xComfort_Adapter_9214125_u0_overload
+    #  name: "Podlaha patro  (Vstup topení) (overload)"
+    #  state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_9214125_u0')['overload'] | float }}"
+    #  unit_of_measurement: ""
+    #  device_class: value
+
+    # Obývák - termostat/topení
+    - unique_id: eaton_obyvaci_pokoj_adjustment
+      name: "[Obývací pokoj] Regulace"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_4131920_w')['temperature'] | float }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      default_entity_id: sensor.eaton_obyvaci_pokoj_adjustment
+    - unique_id: eaton_obyvaci_pokoj_temperature
+      name: "[Obývací pokoj] Teplota"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_4131920_u0')['temperature'] | float }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      default_entity_id: sensor.eaton_obyvaci_pokoj_temperature
+    - unique_id: eaton_obyvaci_pokoj_humidity
+      name: "[Obývací pokoj] Vlhkost"
+      state: "{{ state_attr('sensor.eaton', 'hdm_xComfort_Adapter_4131920_u1')['humidity'] | float }}"
+      unit_of_measurement: "%"
+      device_class: humidity
+      default_entity_id: sensor.eaton_obyvaci_pokoj_humidity
+
+  # Eaton - žaluzie
+  - cover:
+    - name: "Eaton - [Vrch](velke) Ven. Žaluzie"
+      default_entity_id: cover.eaton_vrch_velke_ven_zaluzie
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9429183_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9429183_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9429183_u0_stop
+    - name: "Eaton - [Vrch](male) Ven. Žaluzie"
+      default_entity_id: cover.eaton_vrch_male_ven_zaluzie
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9384490_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9384490_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9384490_u0_stop
+    - name: "Eaton - [Kuchyň](ok) Ven. Žaluzie"
+      default_entity_id: cover.eaton_kuchyn_ok_ven_zaluzie
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4291880_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4291880_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4291880_u0_stop
+    - name: "Eaton - [Obývák](ok) Ven. Žaluzie"
+      default_entity_id: cover.eaton_obyvak_ok_ven_zaluzie
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417035_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417035_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417035_u0_stop
+    - name: "Eaton - [Obývák](dv) Ven. Žaluzie"
+      default_entity_id: cover.eaton_obyvak_dv_ven_zaluzie
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417194_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417194_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_8417194_u0_stop
+    - name: "Eaton - [Obývák] Žaluzie (P)"
+      default_entity_id: cover.eaton_obyvak_zaluzie_p
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3150247_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3150247_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3150247_u0_stop
+    - name: "Eaton - [Obývák] Žaluzie (L)"
+      default_entity_id: cover.eaton_obyvak_zaluzie_l
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883518_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883518_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883518_u0_stop
+    - name: "Eaton - [Obývák] Střešní okna"
+      default_entity_id: cover.eaton_obyvak_stresni_okna
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4112592_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4112592_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4112592_u0_stop
+    - name: "Eaton - [Balkón] Markíza"
+      default_entity_id: cover.eaton_balkon_markiza
+      open_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883588_u0_open
+      close_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883588_u0_close
+      stop_cover:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_2883588_u0_stop
+
+  # Eaton - světla
+  - light:
+    - name: "[Vrch] Gauč světlo"
+      default_entity_id: light.eaton_vrch_gauc_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_9367063_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_9367063_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9367063_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9367063_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_9367063_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Vrch] Světlo"
+      default_entity_id: light.eaton_vrch_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119267_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119267_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119267_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119267_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119267_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Schody] Světlo"
+      default_entity_id: light.eaton_schody_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119263_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119263_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119263_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119263_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119263_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Pracovna] Světlo"
+      default_entity_id: light.eaton_pracovna_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4116923_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4116923_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116923_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116923_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116923_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Jídelna"
+      default_entity_id: light.eaton_obyvak_jidelna
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139062_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139062_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139062_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139062_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139062_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Vstup"
+      default_entity_id: light.eaton_obyvak_vstup
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4203215_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4203215_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4203215_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4203215_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4203215_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Před ložnicí"
+      default_entity_id: light.eaton_obyvak_pred_loznici
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119299_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4119299_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119299_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119299_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4119299_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Nad TV"
+      default_entity_id: light.eaton_obyvak_nad_tv
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4275181_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4275181_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4275181_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4275181_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4275181_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Kuchyň] Vrchní Skříňky"
+      default_entity_id: light.eaton_kuchyn_vrchni_skrinky
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4110125_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4110125_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4110125_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4110125_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4110125_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Ložnice] Světlo"
+      default_entity_id: light.eaton_loznice_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139192_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139192_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139192_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139192_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139192_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Kuchyň] Světlo"
+      default_entity_id: light.eaton_kuchyn_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139113_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4139113_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139113_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139113_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4139113_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Koupelna] Světlo"
+      default_entity_id: light.eaton_koupelna_svetlo
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_3782040_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_3782040_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3782040_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3782040_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_3782040_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Chodba] Vstup"
+      default_entity_id: light.eaton_chodba_vstup
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4201923_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4201923_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4201923_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4201923_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4201923_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Podhled (Střed)"
+      default_entity_id: light.eaton_obyvak_podhled_stred
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4116920_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4116920_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116920_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116920_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4116920_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+    - name: "[Obývák] Podhled (Kraj)"
+      default_entity_id: light.eaton_obyvak_podhled_kraj
+      level: >-
+        {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4129662_u0') | int(0)) * 255 / 100 }}
+      state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_4129662_u0') | int(0)) > 0 }}"
+      turn_on:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4129662_u0_set_level
+          data:
+            brightness_pct: 100
+      turn_off:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4129662_u0_set_level
+          data:
+            brightness_pct: 0
+      set_level:
+        - action: rest_command.eaton_hdm_xcomfort_adapter_4129662_u0_set_level
+          data:
+            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+
+rest_command:
+  # Eaton - stmívatelná světla
+  eaton_hdm_xcomfort_adapter_9367063_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9367063_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4119267_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:4119267_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4119263_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_4", "device": "xCo:4119263_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4116923_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_3", "device": "xCo:4116923_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4139062_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4139062_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4203215_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4203215_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4119299_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4119299_u0", "density": {{ brightness_pct }}}'
+  #eaton_hdm_xcomfort_adapter_4275181_u0_set_level:
+  #  url: "http://homeassistant.local:28080/state"
+  #  method: POST
+  #  headers:
+  #    Content-Type: application/json
+  #  payload: '{"room": "hz_1", "device": "xCo:4275181_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4110125_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4110125_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4139192_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_2", "device": "xCo:4139192_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4139113_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4139113_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_3782040_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_6", "device": "xCo:3782040_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4201923_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_4", "device": "xCo:4201923_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4116920_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4116920_u0", "density": {{ brightness_pct }}}'
+  eaton_hdm_xcomfort_adapter_4129662_u0_set_level:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4129662_u0", "density": {{ brightness_pct }}}'
+
+  # Eaton - žaluzie
+  eaton_hdm_xcomfort_adapter_9429183_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9429183_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_9429183_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9429183_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_9429183_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9429183_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_9384490_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9384490_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_9384490_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9384490_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_9384490_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_5", "device": "xCo:9384490_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_4291880_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4291880_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_4291880_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4291880_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_4291880_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4291880_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_8417035_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417035_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_8417035_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417035_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_8417035_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417035_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_8417194_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417194_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_8417194_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417194_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_8417194_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:8417194_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_3150247_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:3150247_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_3150247_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:3150247_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_3150247_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:3150247_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_2883518_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883518_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_2883518_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883518_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_2883518_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883518_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_4112592_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4112592_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_4112592_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4112592_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_4112592_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:4112592_u0", "state": "stop"}'
+  eaton_hdm_xcomfort_adapter_2883588_u0_open:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883588_u0", "state": "open"}'
+  eaton_hdm_xcomfort_adapter_2883588_u0_close:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883588_u0", "state": "close"}'
+  eaton_hdm_xcomfort_adapter_2883588_u0_stop:
+    url: "http://homeassistant.local:28080/state"
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: '{"room": "hz_1", "device": "xCo:2883588_u0", "state": "stop"}'
+
+light:
+  - platform: rpi_gpio_pwm
+    leds:
+      - name: RPI Cooling Fan
+        pin: 14
+
+switch:
+  # https://www.home-assistant.io/integrations/switch.rest/
+
+  # Eaton - světla apod. bez stmívání
+  - platform: rest
+    name: Eaton - [Vrch-WC] Ventilátor
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_5/xCo:4128040_u0
+    body_on: '{"room": "hz_5", "device": "xCo:4128040_u0", "state": "on"}'
+    body_off: '{"room": "hz_5", "device": "xCo:4128040_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - [Koupelna] Odsávání
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_6/xCo:4107167_u0
+    body_on: '{"room": "hz_6", "device": "xCo:4107167_u0", "state": "on"}'
+    body_off: '{"room": "hz_6", "device": "xCo:4107167_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - [Koupelna] Zrcadlo
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_6/xCo:4128031_u0
+    body_on: '{"room": "hz_6", "device": "xCo:4128031_u0", "state": "on"}'
+    body_off: '{"room": "hz_6", "device": "xCo:4128031_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - [Vrch-WC] Světlo
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_5/xCo:2882672_u0
+    body_on: '{"room": "hz_5", "device": "xCo:2882672_u0", "state": "on"}'
+    body_off: '{"room": "hz_5", "device": "xCo:2882672_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - [Kuchyň] Spodní Skříňky
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_1/xCo:6026236_u0
+    body_on: '{"room": "hz_1", "device": "xCo:6026236_u0", "state": "on"}'
+    body_off: '{"room": "hz_1", "device": "xCo:6026236_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - [Schody] LED osvětlení
+    resource: http://homeassistant.local:28080/state
+    state_resource: http://homeassistant.local:28080/state/hz_4/xCo:4127958_u0
+    body_on: '{"room": "hz_4", "device": "xCo:4127958_u0", "state": "on"}'
+    body_off: '{"room": "hz_4", "device": "xCo:4127958_u0", "state": "off"}'
+    is_on_template: '{{ value_json.state }}'
+    headers:
+      Content-Type: application/json
+
+  # Eaton - světla apod
+  #- platform: rest
+  #  name: Eaton - [Schody] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_4/xCo:4119263_u0
+  #  body_on: '{"room": "hz_4", "device": "xCo:4119263_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_4", "device": "xCo:4119263_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Pracovna] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_3/xCo:4116923_u0
+  #  body_on: '{"room": "hz_3", "device": "xCo:4116923_u0", "density": 50}'
+  #  body_off: '{"room": "hz_3", "device": "xCo:4116923_u0", "density": 0}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Vrch] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_5/xCo:2882672_u0
+  #  body_on: '{"room": "hz_5", "device": "xCo:2882672_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_5", "device": "xCo:2882672_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Jídelna
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4139062_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4139062_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4139062_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Vstup
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4203215_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4203215_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4203215_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Před ložnicí
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4119299_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4119299_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4119299_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Kuchyň] Vrchní Skříňky
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4110125_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4110125_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4110125_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Ložnice] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_2/xCo:4139192_u0
+  #  body_on: '{"room": "hz_2", "device": "xCo:4139192_u0", "density": 50}'
+  #  body_off: '{"room": "hz_2", "device": "xCo:4139192_u0", "density": 0}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Kuchyň] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4139113_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4139113_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4139113_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Koupelna] Světlo
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_6/xCo:3782040_u0
+  #  body_on: '{"room": "hz_6", "device": "xCo:3782040_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_6", "device": "xCo:3782040_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Chodba] Vstup
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_4/xCo:4201923_u0
+  #  body_on: '{"room": "hz_4", "device": "xCo:4201923_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_4", "device": "xCo:4201923_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Podhled (Střed)
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4116920_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4116920_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4116920_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Podhled (Kraj)
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4129662_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4129662_u0", "state": "on"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4129662_u0", "state": "off"}'
+  #  is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+
+  # Eaton - žaluzie
+  #- platform: rest
+  #  name: Eaton - [Kuchyň](ok) Ven. Žaluzie
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4291880_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4291880_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4291880_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák](ok) Ven. Žaluzie
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:8417035_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:8417035_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:8417035_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák](dv) Ven. Žaluzie
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:8417194_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:8417194_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:8417194_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Žaluzie (P)
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:3150247_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:3150247_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:3150247_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Žaluzie (L)
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:2883518_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:2883518_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:2883518_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Obývák] Střešní okna
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:4112592_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:4112592_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:4112592_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+  #- platform: rest
+  #  name: Eaton - [Balkón] Markíza
+  #  resource: http://homeassistant.local:28080/state
+  #  state_resource: http://homeassistant.local:28080/state/hz_1/xCo:2883588_u0
+  #  body_on: '{"room": "hz_1", "device": "xCo:2883588_u0", "state": "open"}'
+  #  body_off: '{"room": "hz_1", "device": "xCo:2883588_u0", "state": "close"}'
+  #  #is_on_template: '{{ value_json.state }}'
+  #  headers:
+  #    Content-Type: application/json
+
+  # Eaton - Scény
+  - platform: rest
+    name: Eaton - Tma
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_1", "scene": "MA2"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - Světlo
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_1", "scene": "MA3"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - Stín
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_1", "scene": "MA4"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - Jasno
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_1", "scene": "MA6"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - TV
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_1", "scene": "MA7"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - Vše VYPNOUT
+    resource: http://homeassistant.local:28080/triggerScene
+    body_on: '{"room": "hz_7", "scene": "MA1"}'
+    headers:
+      Content-Type: application/json
+
+  # Eaton - Macra
+  # todo - pridat vrch (zaluzie)
+  - platform: rest
+    name: Eaton - Obývák 50%
+    resource: http://homeassistant.local:28080/triggerMacro
+    body_on: '{"room": "hz_1", "scene": "MA9"}'
+    headers:
+      Content-Type: application/json
+  - platform: rest
+    name: Eaton - Vyvětrat
+    resource: http://homeassistant.local:28080/triggerMacro
+    body_on: '{"room": "hz_1", "scene": "MA8"}'
+    headers:
+      Content-Type: application/json
+
+# Following MQTT settings is deprecated (probably because these are the default values)
+#mqtt:
+#  discovery: true
+#  discovery_prefix: homeassistant
+
+influxdb:
+  max_retries: 3
+  default_measurement: state
+  include:
+    entities:
+      ## Mortalek
+      - person.mortalek
+      - sensor.imortalek_average_active_pace
+      - sensor.imortalek_steps
+      - sensor.imortalek_distance
+      - sensor.imortalek_floors_ascended
+      - sensor.imortalek_floors_descended
+      - sensor.imortalek_battery_level
+      - sensor.imortalek_battery_state
+      ## Adin
+      - person.adin
+      - sensor.denisa_iphone_average_active_pace
+      - sensor.denisa_iphone_steps
+      - sensor.denisa_iphone_distance
+      - sensor.denisa_iphone_floors_ascended
+      - sensor.denisa_iphone_floors_descended
+      - sensor.denisa_iphone_battery_level
+      - sensor.denisa_iphone_battery_state
+
+      ## Home Assistant
+      ### CPU
+      - sensor.processor_use
+      - sensor.processor_temperature
+      #- light.rpi_cooling_fan
+      ### memory
+      - sensor.memory_use_percent
+      ### HDD
+      - sensor.disk_free
+      - sensor.disk_use_percent
+      - sensor.last_boot
+
+      ## NAS
+      - sensor.nasmf_temperature
+      - sensor.nasmf_volume_1_average_disk_temp
+      - sensor.nasmf_drive_1_temperature
+      - sensor.nasmf_drive_2_temperature
+      - sensor.nasmf_cpu_utilization_total
+      - sensor.nasmf_memory_usage_real
+      - sensor.nasmf_volume_1_volume_used
+      - sensor.nasmf_volume_1_used_space
+      - sensor.nasmf_download_throughput
+      - sensor.nasmf_upload_throughput
+
+      ## Weather
+      - weather.forecast_doma
+
+      ## Raspberry Pi (Home)
+      - sensor.raspberrypi_cpu_usage
+      - sensor.raspberrypi_disk_use
+      - sensor.raspberrypi_memory_use
+      - sensor.raspberrypi_temperature
+      ### Raspberry Pi-Hole
+      - sensor.pi_hole_ads_blocked_today
+      - sensor.pi_hole_ads_percentage_blocked_today
+      - sensor.pi_hole_dns_queries_cached
+      - sensor.pi_hole_dns_queries_forwarded
+      - sensor.pi_hole_dns_queries_today
+      - sensor.pi_hole_dns_unique_domains
+      - sensor.pi_hole_domains_blocked
+
+      ## TV Skříňka
+      # ESP - s větrákem a DHT
+      - sensor.tv_skrinka_temperature
+      - sensor.tv_skrinka_vlhkost
+      - fan.tv_skrinka_vetrak_ha
+      - sensor.tv_skrinka_vetrak_ha_rpm
+      - fan.tv_skrinka_vetrak_stred
+      - sensor.tv_skrinka_vetrak_stred_rpm
+
+      ## Audio Skříňka
+      # ESP - s větrákem a DHT
+      - sensor.obyvak_audio_skrinka_temperature
+      - sensor.obyvak_audio_skrinka_humidity
+      - fan.obyvak_audio_skrinka_vetrak_stred
+      - sensor.obyvak_audio_skrinka_vetrak_stred_rpm
+
+      ## Obývák klima
+      - sensor.obyvak_klima_teplomer
+      - sensor.obyvak_klima_vlhkost
+
+      ## Pracovna
+      - sensor.pracovna_teplomer
+      - sensor.pracovna_vlhkost
+
+      ## Ložnice
+      - sensor.loznice_teplomer
+      - sensor.loznice_vlhkost
+      - sensor.loznice_tlak
+
+      ## Chodba
+      #- sensor.chodba_teplomer
+      #- sensor.chodba_vlhkost
+
+      ## Trezor
+      #- sensor.trezor_teplomer
+      #- sensor.trezor_vlhkost
+
+      ## Vrch klima
+      - sensor.vrch_klima_teplomer
+      - sensor.vrch_klima_vlhkost
+
+      ## Eaton
+      - sensor.eaton_obyvaci_pokoj_adjustment
+      - sensor.eaton_obyvaci_pokoj_temperature
+      - sensor.eaton_obyvaci_pokoj_humidity
+      - sensor.eaton_vrch_adjustment
+      - sensor.eaton_vrch_temperature
+
+      ### Vrch - podlahovka
+      - sensor.eaton_vrch_podlaha_temperature
+      - sensor.eaton_vrch_podlaha_power
+      - sensor.eaton_vrch_podlaha_power_percentage
+
+      ## iRobot Arnold
+      - vacuum.arnold
+      - sensor.arnold_battery_level
+
+      ## Router
+      - sensor.rt_ac88u_6328_kib_s_received
+      - sensor.rt_ac88u_6328_kib_s_sent
+      - binary_sensor.rt_ac88u_6328_wan_status
+      - sensor.rt_ac88u_6328_wan_status
+
+      # air quality
+      - sensor.air_quality_air_quality_index
+      - sensor.air_quality_ikea_co
+      - sensor.air_quality_pm25
+      - sensor.air_quality_teplota
+      - sensor.air_quality_vlhkost
+
+      # vrch - panely
+      - sensor.shellyplugsg3_54320467c3c8_switch_0_energy
+      - sensor.shellyplugsg3_54320467c3c8_switch_0_power
+
+      # vrch - router skrinka
+      - sensor.vrch_router_teplomer
+      - sensor.vrch_router_vlhkost
+      - sensor.vrch_router_vetrak_1_rpm
+
+# this will keep the entity data forever?
+history:
+  include:
+    entities:
+      ## Mortalek
+      - person.mortalek
+      - sensor.imortalek_average_active_pace
+      - sensor.imortalek_steps
+      - sensor.imortalek_distance
+      - sensor.imortalek_floors_ascended
+      - sensor.imortalek_floors_descended
+      - sensor.imortalek_battery_level
+      - sensor.imortalek_battery_state
+      ## Adin
+      - person.adin
+      - sensor.denisa_iphone_average_active_pace
+      - sensor.denisa_iphone_steps
+      - sensor.denisa_iphone_distance
+      - sensor.denisa_iphone_floors_ascended
+      - sensor.denisa_iphone_floors_descended
+      - sensor.denisa_iphone_battery_level
+      - sensor.denisa_iphone_battery_state
+      ## Weather
+      - weather.forecast_doma
+      ## Router
+      - binary_sensor.rt_ac88u_6328_wan_status
+      - sensor.rt_ac88u_6328_wan_status
+      ## NAS
+      - sensor.nasmf_drive_1_status
+      - sensor.nasmf_drive_2_status
