@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.19.2 - 2026-07-09
 - Allow to `stop` covers
 
 ## 1.19.1 - 2026-07-08
