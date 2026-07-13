@@ -725,6 +725,8 @@ module Api =
         let private isOnCache: Cache<ZoneId * DeviceId, bool> = create()
         let private heatingCache: Cache<ShortDeviceId, HeatingStats> = create()
         let private valueCache: Cache<ZoneId * DeviceId, int> = create()
+        let private userSetAt: Cache<ZoneId * DeviceId, DateTimeOffset> = create()
+        let private optimisticWindow = TimeSpan.FromSeconds 20.
 
         type CurrentState = {
             DeviceId: DeviceId
@@ -810,14 +812,34 @@ module Api =
         }
 
         let storeState zone (deviceState: CurrentState) =
-            isOnCache |> Cache.set (Key (zone, deviceState.DeviceId)) deviceState.IsOn
+            let key = Key (zone, deviceState.DeviceId)
+            let inOptimisticWindow =
+                userSetAt
+                |> Cache.tryFind key
+                |> Option.map (fun setAt -> DateTimeOffset.Now - setAt < optimisticWindow)
+                |> Option.defaultValue false
+
+            if not inOptimisticWindow then
+                isOnCache |> Cache.set key deviceState.IsOn
+                deviceState.Value
+                |> Option.iter (fun v -> valueCache |> Cache.set key v)
+
+            deviceState.HeatingStats
+            |> Option.iter (fun heating -> heatingCache |> Cache.set (deviceState.DeviceId |> DeviceId.shortId |> Key) heating)
+
+            lastUpdated <- DateTimeOffset.Now
+
+        let storeUserState zone (deviceState: CurrentState) =
+            let key = Key (zone, deviceState.DeviceId)
+            isOnCache |> Cache.set key deviceState.IsOn
 
             deviceState.HeatingStats
             |> Option.iter (fun heating -> heatingCache |> Cache.set (deviceState.DeviceId |> DeviceId.shortId |> Key) heating)
 
             deviceState.Value
-            |> Option.iter (fun v -> valueCache |> Cache.set (Key (zone, deviceState.DeviceId)) v)
+            |> Option.iter (fun v -> valueCache |> Cache.set key v)
 
+            userSetAt |> Cache.set key DateTimeOffset.Now
             lastUpdated <- DateTimeOffset.Now
 
         let rec startLoadingState ((_, output) as io: IO) config zones: Async<unit> = async {
@@ -918,7 +940,7 @@ module Api =
             | On | Open -> true
             | _ -> false
 
-        DeviceStates.storeState deviceState.Room {
+        DeviceStates.storeUserState deviceState.Room {
             DeviceId = deviceState.Device
             IsOn = isOn
             HeatingStats = None
