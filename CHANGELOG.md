@@ -2,6 +2,8 @@
 
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
+
+## 1.19.3 - 2026-07-13
 - Fix dimmable lights "forgetting" their state in HA: add a 20 s optimistic write-protection window in `DeviceStates` so the 10 s background poll no longer overwrites a value just set by an HA command
 - Add `DeviceStates.storeUserState` (records `userSetAt` timestamp) used by `changeDeviceState`; `storeState` (poll path) now only writes `isOnCache`/`valueCache` when outside the optimistic window (`heatingCache` is always updated)
 - Fire `homeassistant.update_entity` on `sensor.eaton_brightness` after every generated light `turn_on`/`turn_off`/`set_level` so HA re-reads the state immediately
