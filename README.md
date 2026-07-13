@@ -118,13 +118,13 @@ cover:
 
 ### Lights (dimmers)
 
-Dimmers are exposed as `light` template entities with full brightness control. The brightness state is read back from a single aggregated REST sensor (`sensor.eaton_brightness`) polled every 60 s, so physical or Eaton-app changes are reflected in HA within one poll cycle.
+Dimmers are exposed as `light` template entities with full brightness control. The brightness state is read back from a single aggregated REST sensor (`sensor.eaton_brightness`) polled every 10 s, so physical or Eaton-app changes are reflected in HA within one poll cycle. Each command also fires `homeassistant.update_entity` so HA re-reads the state immediately, and the bridge keeps a 20 s optimistic window (see [State & cache flow](#state--cache-flow)) so a freshly-set value is not overwritten by a stale controller poll.
 
 ```yaml
 sensor:
   - platform: rest
     resource: http://192.168.1.10:28080/brightness
-    scan_interval: 60
+    scan_interval: 10
     name: eaton_brightness
     value_template: OK
     json_attributes_path: "$.Brightness"
@@ -139,26 +139,34 @@ rest_command:
       Content-Type: application/json
     payload: '{"room": "hz_1", "device": "xCo:9214125_u0", "density": {{ brightness_pct }}}'
 
-light:
-  - platform: template
-    lights:
-      eaton_light_hdm_xComfort_Adapter_9214125_u0:
-        friendly_name: "Living Room Dimmer"
-        level_template: >-
+template:
+  - light:
+      - name: "Living Room Dimmer"
+        default_entity_id: light.eaton_light_hdm_xComfort_Adapter_9214125_u0
+        level: >-
           {{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_9214125_u0') | int(0)) * 255 / 100 }}
-        value_template: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_9214125_u0') | int(0)) > 0 }}"
+        state: "{{ (state_attr('sensor.eaton_brightness', 'hdm_xComfort_Adapter_9214125_u0') | int(0)) > 0 }}"
         turn_on:
-          action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
-          data:
-            brightness_pct: 100
+          - action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
+            data:
+              brightness_pct: 100
+          - action: homeassistant.update_entity
+            target:
+              entity_id: sensor.eaton_brightness
         turn_off:
-          action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
-          data:
-            brightness_pct: 0
+          - action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
+            data:
+              brightness_pct: 0
+          - action: homeassistant.update_entity
+            target:
+              entity_id: sensor.eaton_brightness
         set_level:
-          action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
-          data:
-            brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+          - action: rest_command.eaton_hdm_xComfort_Adapter_9214125_u0_set_level
+            data:
+              brightness_pct: "{{ (brightness / 255 * 100) | round(0) }}"
+          - action: homeassistant.update_entity
+            target:
+              entity_id: sensor.eaton_brightness
 ```
 
 ### Climate (floor heating)
@@ -201,4 +209,40 @@ climate:
         min_temp: 5
         max_temp: 30
         target_temp_step: 0.5
+```
+
+---
+
+## State & cache flow
+
+```mermaid
+flowchart TD
+    HA["Home Assistant"]
+    Eaton["Eaton Controller"]
+
+    subgraph Bridge["Bridge (DeviceStates)"]
+        storeUserState["storeUserState\n(command path)"]
+        storeState["storeState\n(poll path)"]
+
+        isOnCache[("isOnCache\nzone+device → bool")]
+        valueCache[("valueCache\nzone+device → int")]
+        heatingCache[("heatingCache\ndevice → HeatingStats")]
+        userSetAt[("userSetAt\nzone+device → timestamp\n20 s optimistic window")]
+    end
+
+    HA -->|"POST /state\nturn on / off / dim"| storeUserState
+    storeUserState -->|"write"| isOnCache
+    storeUserState -->|"write"| valueCache
+    storeUserState -->|"stamp now"| userSetAt
+    HA -->|"update_entity after command\n→ immediate re-poll"| valueCache
+
+    Eaton -->|"getDevices RPC\nevery 10 s"| storeState
+    storeState -->|"read guard"| userSetAt
+    storeState -.->|"write only if\noutside 20 s window"| isOnCache
+    storeState -.->|"write only if\noutside 20 s window"| valueCache
+    storeState -->|"always write"| heatingCache
+
+    isOnCache -->|"GET /state/{zone}/{device}"| HA
+    valueCache -->|"GET /brightness\nevery 10 s"| HA
+    heatingCache -->|"GET /sensors"| HA
 ```
