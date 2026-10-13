@@ -69,7 +69,7 @@ module Api =
 
                     Uri (host, path)
                 with
-                | e -> failwithf "Url %A is invalid, due to %A" url e
+                | e -> raise <| Exception(sprintf "Url %A is invalid, due to %A" url e)
 
         [<RequireQualifiedAccess>]
         module Path =
@@ -842,6 +842,7 @@ module Api =
             userSetAt |> Cache.set key DateTimeOffset.Now
             lastUpdated <- DateTimeOffset.Now
 
+        [<TailCall>]
         let rec startLoadingState ((_, output) as io: IO) config zones: Async<unit> = async {
             output.Section "[Eaton] Loading Device States ..."
 
@@ -1097,6 +1098,7 @@ module Api =
             }
             |> retryOnUnauthorized io config
 
+        [<TailCall>]
         let rec private callSpSteps config (zone: ZoneId) rpcMethod (remaining: int) : AsyncResult<unit, ApiError> =
             if remaining <= 0 then
                 AsyncResult.ofSuccess ()
