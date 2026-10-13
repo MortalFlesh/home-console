@@ -1,24 +1,18 @@
 {
-    "version": 1,
-    "isRoot": true,
-    "tools": {
-        "fake-cli": {
-            "version": "6.1.4",
-            "commands": [
-                "fake"
-            ]
-        },
-        "paket": {
-            "version": "10.3.1",
-            "commands": [
-                "paket"
-            ]
-        },
-        "dotnet-fsharplint": {
-            "version": "0.23.6",
-            "commands": [
-                "dotnet-fsharplint"
-            ]
-        }
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "paket": {
+      "version": "10.3.1",
+      "commands": [
+        "paket"
+      ]
+    },
+    "dotnet-fsharplint": {
+      "version": "0.26.10",
+      "commands": [
+        "dotnet-fsharplint"
+      ]
     }
+  }
 }

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Core/Core.fsproj" />
+    <Project Path="src/Eaton/Eaton.fsproj" />
+    <Project Path="src/Utils/Utils.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/tests.fsproj" />
+  </Folder>
+  <Project Path="home-console.fsproj" />
+</Solution>
