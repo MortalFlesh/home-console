@@ -3,6 +3,9 @@
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
 
+### Fix
+- Fix generated HA YAML reading JSON keys with the wrong casing: the bridge serialises responses in camelCase, so `sensor.eaton_brightness` now uses `json_attributes_path: "$.brightness"`, the climate REST sensor uses `value_json.temperature` / `temperature` / `setpoint`, and `binary_sensor.eaton_bridge` uses `value_json.status`. With `$.Brightness` HA never received any brightness attribute, every template light was permanently `off`, and the toggle in the HA UI snapped back a moment after being switched on
+
 ## 1.19.3 - 2026-07-13
 - Fix dimmable lights "forgetting" their state in HA: add a 20 s optimistic write-protection window in `DeviceStates` so the 10 s background poll no longer overwrites a value just set by an HA command
 - Add `DeviceStates.storeUserState` (records `userSetAt` timestamp) used by `changeDeviceState`; `storeState` (poll path) now only writes `isOnCache`/`valueCache` when outside the optimistic window (`heatingCache` is always updated)
