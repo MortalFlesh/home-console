@@ -139,7 +139,7 @@ module HaYaml =
             "    scan_interval: 10"
             "    name: eaton_brightness"
             "    value_template: OK"
-            "    json_attributes_path: \"$.Brightness\""
+            "    json_attributes_path: \"$.brightness\""
             "    json_attributes:"
             yield! dimmerAttrIds |> List.map (fun id -> $"      - {id}")
 
@@ -222,10 +222,10 @@ module HaYaml =
                             $"    resource: http://{currentHost}/climate/{zoneId}"
                             "    scan_interval: 60"
                             $"    name: {sensorName}"
-                            $"    value_template: \"{{{{ value_json.Temperature }}}}\""
+                            $"    value_template: \"{{{{ value_json.temperature }}}}\""
                             "    json_attributes:"
-                            "      - Temperature"
-                            "      - Setpoint"
+                            "      - temperature"
+                            "      - setpoint"
                         ]
                     )
 
@@ -261,8 +261,8 @@ module HaYaml =
                         [
                             $"      {climateId}:"
                             $"        friendly_name: \"{name}\""
-                            $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Temperature') | float(0) }}}}\""
-                            $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'Setpoint') | float(0) }}}}\""
+                            $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'temperature') | float(0) }}}}\""
+                            $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'setpoint') | float(0) }}}}\""
                             "        hvac_modes:"
                             "          - heat"
                             "        hvac_mode_template: \"heat\""
@@ -283,7 +283,7 @@ module HaYaml =
             "  - platform: rest"
             $"    resource: http://{currentHost}/health"
             "    name: eaton_bridge"
-            "    value_template: \"{{ value_json.Status == 'ok' }}\""
+            "    value_template: \"{{ value_json.status == 'ok' }}\""
             "    device_class: connectivity"
             "    scan_interval: 60"
         ]

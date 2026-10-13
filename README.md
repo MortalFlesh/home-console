@@ -127,7 +127,7 @@ sensor:
     scan_interval: 10
     name: eaton_brightness
     value_template: OK
-    json_attributes_path: "$.Brightness"
+    json_attributes_path: "$.brightness"
     json_attributes:
       - hdm_xComfort_Adapter_9214125_u0
 
@@ -179,10 +179,10 @@ sensor:
     resource: http://192.168.1.10:28080/climate/hz_5
     scan_interval: 60
     name: eaton_climate_hdm_xComfort_Adapter_9214125
-    value_template: "{{ value_json.Temperature }}"
+    value_template: "{{ value_json.temperature }}"
     json_attributes:
-      - Temperature
-      - Setpoint
+      - temperature
+      - setpoint
 
 rest_command:
   eaton_climate_hdm_xComfort_Adapter_9214125_set_temp:
@@ -197,8 +197,8 @@ climate:
     climates:
       eaton_climate_hdm_xComfort_Adapter_9214125:
         friendly_name: "Living Room Thermostat"
-        current_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Temperature') | float(0) }}"
-        target_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'Setpoint') | float(0) }}"
+        current_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'temperature') | float(0) }}"
+        target_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'setpoint') | float(0) }}"
         hvac_modes:
           - heat
         hvac_mode_template: "heat"
