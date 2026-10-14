@@ -2,7 +2,7 @@
     "hdm:Weather Service Protocol Adapter:4915000152587890616700000762939453_t": {
         "msgsPerDay": "63",
         "lastMsgTimeStamp": "18:34:06",
-        "eventLog": "15.0"
+        "eventLog": "15.2"
     },
     "hdm:xComfort Adapter:4116920": {
         "msgsPerDay": "2",
@@ -17,6 +17,6 @@
     "hdm:xComfort Adapter:8649687_w": {
         "msgsPerDay": "33",
         "lastMsgTimeStamp": "18:03:50",
-        "eventLog": "-4.0"
+        "eventLog": "-4.3"
     }
 }
