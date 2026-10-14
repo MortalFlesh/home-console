@@ -171,7 +171,7 @@ template:
 
 ### Climate (floor heating)
 
-Each room controller generates three YAML blocks. `GET /climate/{zone}` returns the live temperature and setpoint; `POST /climate` accepts `{"room": "<zone>", "temperature": <value>}` and adjusts the Eaton setpoint in 0.5 °C steps.
+Each room controller generates three YAML blocks. The `climate:` block uses the `climate_template` platform from the HACS [Template Climate](https://github.com/jcwillox/hass-template-climate) integration (not part of core HA). `GET /climate/{zone}` returns the live temperature and setpoint; `POST /climate` accepts `{"room": "<zone>", "temperature": <value>}` and adjusts the Eaton setpoint in 0.5 °C steps.
 
 ```yaml
 sensor:
@@ -193,22 +193,24 @@ rest_command:
     payload: '{"room": "hz_5", "temperature": {{ temperature }}}'
 
 climate:
-  - platform: template
-    climates:
-      eaton_climate_hdm_xComfort_Adapter_9214125:
-        friendly_name: "Living Room Thermostat"
-        current_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'temperature') | float(0) }}"
-        target_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'setpoint') | float(0) }}"
-        hvac_modes:
-          - heat
-        hvac_mode_template: "heat"
-        set_temperature:
-          action: rest_command.eaton_climate_hdm_xComfort_Adapter_9214125_set_temp
-          data:
-            temperature: "{{ temperature }}"
-        min_temp: 5
-        max_temp: 30
-        target_temp_step: 0.5
+  - platform: climate_template
+    name: "Living Room Thermostat"
+    unique_id: eaton_climate_hdm_xComfort_Adapter_9214125
+    modes:
+      - heat
+    hvac_mode_template: "heat"
+    current_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'temperature') | float(0) }}"
+    target_temperature_template: "{{ state_attr('sensor.eaton_climate_hdm_xComfort_Adapter_9214125', 'setpoint') | float(0) }}"
+    set_temperature:
+      - action: rest_command.eaton_climate_hdm_xComfort_Adapter_9214125_set_temp
+        data:
+          temperature: "{{ temperature }}"
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.eaton_climate_hdm_xComfort_Adapter_9214125
+    min_temp: 5
+    max_temp: 30
+    temp_step: 0.5
 ```
 
 ---

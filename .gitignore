@@ -40,3 +40,6 @@ logs
 # configs
 .config.json
 .devices.json
+
+# Claude Code MCP config (holds the HA token)
+.mcp.json

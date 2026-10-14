@@ -131,7 +131,7 @@ tailwind.config = { darkMode: 'class' };
                 div [ _class "p-4 mb-4 rounded bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200" ] [
                     strong [] [ str "Requires HACS: " ]
                     str "the "
-                    code [] [ str "climate: - platform: template" ]
+                    code [] [ str "climate: - platform: climate_template" ]
                     str " block is not part of core Home Assistant. Install the "
                     a [
                         _href "https://github.com/jcwillox/hass-template-climate"

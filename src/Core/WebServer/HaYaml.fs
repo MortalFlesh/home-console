@@ -248,8 +248,6 @@ module HaYaml =
 
                 ""
                 "climate:"
-                "  - platform: template"
-                "    climates:"
                 yield!
                     withZone
                     |> List.collect (fun (device, _zoneId) ->
@@ -259,20 +257,24 @@ module HaYaml =
                         let climateId = $"eaton_climate_{id}"
                         let name = Device.effectiveName device
                         [
-                            $"      {climateId}:"
-                            $"        friendly_name: \"{name}\""
-                            $"        current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'temperature') | float(0) }}}}\""
-                            $"        target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'setpoint') | float(0) }}}}\""
-                            "        hvac_modes:"
-                            "          - heat"
-                            "        hvac_mode_template: \"heat\""
-                            "        set_temperature:"
-                            $"          action: rest_command.{restCommandName}"
-                            "          data:"
-                            "            temperature: \"{{ temperature }}\""
-                            "        min_temp: 5"
-                            "        max_temp: 30"
-                            "        target_temp_step: 0.5"
+                            "  - platform: climate_template"
+                            $"    name: \"{name}\""
+                            $"    unique_id: {climateId}"
+                            "    modes:"
+                            "      - heat"
+                            "    hvac_mode_template: \"heat\""
+                            $"    current_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'temperature') | float(0) }}}}\""
+                            $"    target_temperature_template: \"{{{{ state_attr('sensor.{sensorName}', 'setpoint') | float(0) }}}}\""
+                            "    set_temperature:"
+                            $"      - action: rest_command.{restCommandName}"
+                            "        data:"
+                            "          temperature: \"{{ temperature }}\""
+                            "      - action: homeassistant.update_entity"
+                            "        target:"
+                            $"          entity_id: sensor.{sensorName}"
+                            "    min_temp: 5"
+                            "    max_temp: 30"
+                            "    temp_step: 0.5"
                         ]
                     )
             ]

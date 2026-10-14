@@ -4,6 +4,7 @@
 ## Unreleased
 
 ### Fix
+- Fix generated climate YAML: emit the HACS Template Climate `climate: - platform: climate_template` format (one entry per room controller with `name`, `unique_id`, `modes`, `temp_step`, list-form `set_temperature` followed by `homeassistant.update_entity`) instead of an invalid `platform: template` / `climates:` map that HA core rejected with "Unsupported YAML configuration for the template integration"
 - Fix generated HA YAML reading JSON keys with the wrong casing: the bridge serialises responses in camelCase, so `sensor.eaton_brightness` now uses `json_attributes_path: "$.brightness"`, the climate REST sensor uses `value_json.temperature` / `temperature` / `setpoint`, and `binary_sensor.eaton_bridge` uses `value_json.status`. With `$.Brightness` HA never received any brightness attribute, every template light was permanently `off`, and the toggle in the HA UI snapped back a moment after being switched on
 
 ## 1.19.3 - 2026-07-13
