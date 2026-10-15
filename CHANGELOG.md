@@ -3,7 +3,6 @@
 <!-- There is always Unreleased section on the top. Subsections (Add, Changed, Fix, Removed) should be Add as needed. -->
 ## Unreleased
 
-### Fix
 ## 1.19.4 - 2026-10-14
 - Fix parsing `float` values from request/response
 - Fix generated climate YAML: emit the HACS Template Climate `climate: - platform: climate_template` format (one entry per room controller with `name`, `unique_id`, `modes`, `temp_step`, list-form `set_temperature` followed by `homeassistant.update_entity`) instead of an invalid `platform: template` / `climates:` map that HA core rejected with "Unsupported YAML configuration for the template integration"
